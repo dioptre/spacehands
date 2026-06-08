@@ -2,6 +2,7 @@
 #include <cmath>
 #include <iostream>
 #include <set>
+#include <unordered_map>
 #ifndef HAVE_LIBLO
 typedef void* lo_address;
 typedef void* lo_message;
@@ -48,6 +49,17 @@ static void sendCtrl(lo_address tidal, const char* key, float val) {
     lo_message m = lo_message_new();
     lo_message_add_string(m, key);
     lo_message_add_float(m, val);
+    lo_send_message(tidal, "/ctrl", m);
+    lo_message_free(m);
+#endif
+}
+
+static void sendCtrlStr(lo_address tidal, const char* key, const char* val) {
+#ifdef HAVE_LIBLO
+    if (!tidal) return;
+    lo_message m = lo_message_new();
+    lo_message_add_string(m, key);
+    lo_message_add_string(m, val);
     lo_send_message(tidal, "/ctrl", m);
     lo_message_free(m);
 #endif
@@ -186,4 +198,42 @@ void OscSender::send(const HandList& hands, const MusicParams& p, const GameStat
     }
     prev_  = p;
     first_ = false;
+}
+
+void OscSender::sendPool(const InstrumentPool& pool, const HandList& hands, const MusicParams& p) {
+    if (!tidal_) return;
+
+    static int pool_count = 0;
+    if (++pool_count % 2 != 0) return; // ~15Hz
+
+    // Build a map from handId → hand data for quick lookup
+    std::unordered_map<int, const Hand*> handMap;
+    for (const auto& h : hands) handMap[h.id] = &h;
+
+    for (const auto& a : pool.assignments()) {
+        if (!a.active) continue;
+
+        int orbit = a.orbit; // 0-11
+        std::string prefix = "o" + std::to_string(orbit) + "_";
+
+        // Instrument name — Tidal uses cS to read string controls
+        sendCtrlStr(tidal_, (prefix + "inst").c_str(), a.inst.name.c_str());
+        sendCtrlStr(tidal_, (prefix + "slow").c_str(), std::to_string((int)a.inst.slow).c_str());
+
+        // Hand position if available
+        auto it = handMap.find(a.handId);
+        if (it != handMap.end()) {
+            const Hand* h = it->second;
+            sendCtrl(tidal_, (prefix + "x").c_str(),      h->x);
+            sendCtrl(tidal_, (prefix + "y").c_str(),      h->y);
+            sendCtrl(tidal_, (prefix + "z").c_str(),      h->z);
+            sendCtrl(tidal_, (prefix + "g").c_str(),      (float)(int)h->gesture);
+            sendCtrl(tidal_, (prefix + "gain").c_str(),   a.fadeOut * (1.f - h->z * 0.3f));
+            sendCtrl(tidal_, (prefix + "active").c_str(), 1.f);
+            sendCtrl(tidal_, (prefix + "hue").c_str(),    a.inst.hue);
+        } else {
+            sendCtrl(tidal_, (prefix + "gain").c_str(),   a.fadeOut);
+            sendCtrl(tidal_, (prefix + "active").c_str(), a.releaseTimer > 0 ? 1.f : 0.f);
+        }
+    }
 }

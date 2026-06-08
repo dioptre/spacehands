@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <unordered_set>
 #include <opencv2/imgproc.hpp>
 
 #include "camera/CameraSource.h"
@@ -13,6 +14,7 @@
 #include "vision/GestureClassifier.h"
 #include "game/GameState.h"
 #include "game/InstrumentMapper.h"
+#include "game/InstrumentPool.h"
 #include "audio/OscSender.h"
 #include "server/HttpServer.h"
 #include "server/WsServer.h"
@@ -69,6 +71,7 @@ int main(int argc, char* argv[]) {
     // ---- Game / audio ----
     GameState       game;
     InstrumentMapper mapper;
+    InstrumentPool  pool;
     OscSender       osc(cfg.osc_host, cfg.osc_port);
     if (!osc.connect()) {
         std::cerr << "Warning: OSC connection failed — SuperCollider may not be running\n";
@@ -127,6 +130,21 @@ int main(int argc, char* argv[]) {
                                                cam->height(),
                                                f->cam.color);
 
+        // Pool: detect hand arrivals and departures
+        {
+            static std::unordered_set<int> prevHandIds;
+            std::unordered_set<int> curHandIds;
+            for (const auto& h : hands) curHandIds.insert(h.id);
+            // New hands
+            for (int id : curHandIds)
+                if (!prevHandIds.count(id)) pool.assign(id);
+            // Lost hands
+            for (int id : prevHandIds)
+                if (!curHandIds.count(id)) pool.release(id);
+            prevHandIds = curHandIds;
+            pool.tick(dt);
+        }
+
         // Game state
         const auto& state = game.tick(hands, dt);
 
@@ -135,6 +153,8 @@ int main(int argc, char* argv[]) {
 
         // OSC: per-hand depth-bucket messages + global params
         osc.send(hands, music, state);
+        // OSC: pool assignments → Tidal /ctrl
+        osc.sendPool(pool, hands, music);
 
         // MJPEG: hand pixels on black — only within detected bbox, hard luma key
         static int frame_count = 0;

@@ -1,5 +1,6 @@
 #pragma once
 #include "../Types.h"
+#include "../game/InstrumentPool.h"
 #include <string>
 #ifdef HAVE_LIBLO
 #include <lo/lo.h>
@@ -13,6 +14,8 @@ public:
     bool connect();
     // Also send /ctrl to Tidal on port 6010
     void connectTidal(const std::string& host = "127.0.0.1", int port = 6010);
+    // Send pool assignment state to Tidal
+    void sendPool(const class InstrumentPool& pool, const HandList& hands, const MusicParams& p);
     // Called once per frame with full hand list + game state.
     // Per-hand: /hand id x y z_mm z_vel gesture_id
     // Then:     /hands_end bucket0 bucket1 ... (active bucket indices this frame)

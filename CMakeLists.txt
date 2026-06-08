@@ -50,6 +50,7 @@ set(SOURCES
     src/vision/DepthEstimator.cpp
     src/game/GameState.cpp
     src/game/InstrumentMapper.cpp
+    src/game/InstrumentPool.cpp
     src/audio/OscSender.cpp
     src/server/HttpServer.cpp
     src/server/WsServer.cpp
