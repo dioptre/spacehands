@@ -1,0 +1,8 @@
+build/
+models/
+.venv/
+*.o
+*.a
+*.dylib
+*.so
+compile_commands.json

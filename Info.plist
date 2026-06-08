@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.instrument.wormhole</string>
+    <key>CFBundleName</key>
+    <string>instrument</string>
+    <key>CFBundleVersion</key>
+    <string>1.0</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Camera feed for hand detection and visual shader input</string>
+</dict>
+</plist>

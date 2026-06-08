@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wormhole Instrument</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { width:100%; height:100%; background:#000; overflow:hidden; }
+  canvas { display:block; width:100vw; height:100vh; }
+  #debug {
+    position:fixed; top:8px; left:8px;
+    color:rgba(255,255,255,0.35); font:11px monospace;
+    pointer-events:none; white-space:pre;
+  }
+  #shader-switcher {
+    position:fixed; bottom:12px; right:12px;
+    display:flex; gap:8px;
+  }
+  #shader-switcher button {
+    background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2);
+    color:rgba(255,255,255,0.6); font:11px monospace; padding:4px 10px;
+    cursor:pointer; border-radius:3px;
+  }
+  #shader-switcher button:hover { background:rgba(255,255,255,0.2); }
+  #shader-switcher button.active { border-color:rgba(255,255,255,0.7); color:#fff; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="debug"></div>
+<div id="shader-switcher">
+  <button data-shader="wormhole">wormhole</button>
+  <button data-shader="voronoi">voronoi</button>
+  <button data-shader="frequency">frequency</button>
+</div>
+
+<script src="ws_client.js"></script>
+<script>
+// Load shader from ?shader= URL param, default to wormhole
+(function () {
+    const SHADERS = ['wormhole', 'voronoi', 'frequency'];
+    const params  = new URLSearchParams(window.location.search);
+    let current   = params.get('shader') || 'wormhole';
+    if (!SHADERS.includes(current)) current = 'wormhole';
+
+    let scriptEl = null;
+
+    function loadShader(name) {
+        current = name;
+        // Update button states
+        document.querySelectorAll('#shader-switcher button').forEach(b => {
+            b.classList.toggle('active', b.dataset.shader === name);
+        });
+        // Update URL without reload
+        const url = new URL(window.location);
+        url.searchParams.set('shader', name);
+        window.history.replaceState({}, '', url);
+        // Remove old shader script
+        if (scriptEl) scriptEl.remove();
+        // Clear canvas via a new 2D context blank (WebGL context is recreated in shader script)
+        const old = document.getElementById('c');
+        const fresh = old.cloneNode(false);
+        old.parentNode.replaceChild(fresh, old);
+        fresh.id = 'c';
+        // Load new shader
+        scriptEl = document.createElement('script');
+        scriptEl.src = 'shaders/' + name + '.js?t=' + Date.now();
+        document.body.appendChild(scriptEl);
+    }
+
+    document.querySelectorAll('#shader-switcher button').forEach(b => {
+        b.addEventListener('click', () => loadShader(b.dataset.shader));
+    });
+
+    loadShader(current);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "camera":         "mock",
+  "mock_video":     "",
+  "camera_width":   240,
+  "camera_height":  180,
+  "target_fps":     30,
+  "yolo_model":     "models/hand_yolov8n.onnx",
+  "yolo_conf":      0.6,
+  "yolo_iou":       0.4,
+  "osc_host":       "127.0.0.1",
+  "osc_port":       57120,
+  "ws_port":        8081,
+  "http_port":      8080,
+  "mjpeg_port":     8082
+}
