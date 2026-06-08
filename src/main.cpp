@@ -6,6 +6,14 @@
 #include <string>
 #include <thread>
 #include <unordered_set>
+#ifdef HAVE_LIBLO
+#include <lo/lo.h>
+#else
+typedef void* lo_message;
+static lo_message lo_message_new() { return nullptr; }
+static void lo_message_free(lo_message) {}
+static void lo_send_message(void*, const char*, lo_message) {}
+#endif
 #include <opencv2/imgproc.hpp>
 
 #include "camera/CameraSource.h"
@@ -130,19 +138,84 @@ int main(int argc, char* argv[]) {
                                                cam->height(),
                                                f->cam.color);
 
-        // Pool: detect hand arrivals and departures
+        // Pool: debounced hand arrivals/departures
+        // Require ARRIVE_FRAMES consecutive detections before assigning
+        // Require ABSENT_FRAMES consecutive absences before releasing
         {
-            static std::unordered_set<int> prevHandIds;
-            std::unordered_set<int> curHandIds;
-            for (const auto& h : hands) curHandIds.insert(h.id);
-            // New hands
-            for (int id : curHandIds)
-                if (!prevHandIds.count(id)) pool.assign(id);
-            // Lost hands
-            for (int id : prevHandIds)
-                if (!curHandIds.count(id)) pool.release(id);
-            prevHandIds = curHandIds;
+            static constexpr int ARRIVE_FRAMES = 8;  // ~270ms at 30fps
+            static constexpr int ABSENT_FRAMES = 12; // ~400ms at 30fps
+
+            static std::unordered_map<int,int> arriveCount;  // frames seen
+            static std::unordered_map<int,int> absentCount;  // frames absent
+            static std::unordered_set<int>     confirmed;    // assigned to pool
+
+            std::unordered_set<int> curIds;
+            for (const auto& h : hands) curIds.insert(h.id);
+
+            // Increment arrive counter for visible hands
+            for (int id : curIds) {
+                arriveCount[id]++;
+                absentCount.erase(id);
+                if (arriveCount[id] >= ARRIVE_FRAMES && !confirmed.count(id)) {
+                    confirmed.insert(id);
+                    pool.assign(id);
+                }
+            }
+
+            // Increment absent counter for missing hands
+            for (auto it = confirmed.begin(); it != confirmed.end(); ) {
+                int id = *it;
+                if (!curIds.count(id)) {
+                    absentCount[id]++;
+                    arriveCount.erase(id);
+                    if (absentCount[id] >= ABSENT_FRAMES) {
+                        pool.release(id);
+                        absentCount.erase(id);
+                        it = confirmed.erase(it);
+                        continue;
+                    }
+                }
+                ++it;
+            }
+
+            // Clean up arrive counters for hands that disappeared before confirming
+            for (auto it = arriveCount.begin(); it != arriveCount.end(); ) {
+                if (!curIds.count(it->first)) it = arriveCount.erase(it);
+                else ++it;
+            }
+
             pool.tick(dt);
+
+            // Hush all patterns after 15s with no confirmed hands
+            static float silenceTimer = 0.f;
+            static bool  hushed = false;
+            if (confirmed.empty()) {
+                silenceTimer += dt;
+                if (silenceTimer >= 15.f && !hushed) {
+                    hushed = true;
+#ifdef HAVE_LIBLO
+                    if (osc.tidalAddr()) {
+                        lo_address ta = (lo_address)osc.tidalAddr();
+                        // Zero all orbit gains — keeps patterns alive but silent
+                        for (int i = 0; i < 12; i++) {
+                            std::string key = "o" + std::to_string(i) + "_gain";
+                            lo_message m = lo_message_new();
+                            lo_message_add_string(m, key.c_str());
+                            lo_message_add_float(m, 0.0f);
+                            lo_send_message(ta, "/ctrl", m);
+                            lo_message_free(m);
+                        }
+                    }
+#endif
+                    std::cout << "[Pool] 15s silence — zeroing gains\n";
+                }
+            } else {
+                silenceTimer = 0.f;
+                if (hushed) {
+                    hushed = false;
+                    std::cout << "[Pool] hands returned — gains will restore via pool\n";
+                }
+            }
         }
 
         // Game state

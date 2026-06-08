@@ -155,6 +155,32 @@ void OscSender::send(const HandList& hands, const MusicParams& p, const GameStat
     lo_message_free(me);
 #endif
 
+    // Adjust CPS based on number of hands — more hands = faster tempo
+    // 1 hand = 0.4 cps (~96bpm), 4 hands = 0.7 cps (~168bpm)
+    // Returns to base when hands leave (smoothed)
+    if (tidal_) {
+        static float currentCps = 0.5f;
+        static float targetCps  = 0.5f;
+        int n = (int)hands.size();
+        if (n == 0)      targetCps = 0.4f;
+        else if (n == 1) targetCps = 0.45f;
+        else if (n == 2) targetCps = 0.55f;
+        else if (n == 3) targetCps = 0.62f;
+        else             targetCps = 0.70f;
+
+        // Smooth transition
+        currentCps += (targetCps - currentCps) * 0.02f;
+
+        static float lastSentCps = 0.f;
+        if (std::fabs(currentCps - lastSentCps) > 0.002f) {
+            lastSentCps = currentCps;
+            lo_message m = lo_message_new();
+            lo_message_add_float(m, currentCps);
+            lo_send_message(tidal_, "/setcps", m);
+            lo_message_free(m);
+        }
+    }
+
     // Send hand data as /ctrl to Tidal at ~10Hz (not every frame)
     static int ctrl_count = 0;
     if (tidal_ && (++ctrl_count % 3 == 0)) {
@@ -209,6 +235,17 @@ void OscSender::sendPool(const InstrumentPool& pool, const HandList& hands, cons
     // Build a map from handId → hand data for quick lookup
     std::unordered_map<int, const Hand*> handMap;
     for (const auto& h : hands) handMap[h.id] = &h;
+
+    // Track which orbits are active this frame
+    std::set<int> activeOrbits;
+    for (const auto& a : pool.assignments())
+        if (a.active && a.orbit >= 0) activeOrbits.insert(a.orbit);
+
+    // Zero any orbit not currently active
+    for (int orb = 0; orb < InstrumentPool::MAX_HANDS; orb++) {
+        if (!activeOrbits.count(orb))
+            sendCtrl(tidal_, (std::string("o") + std::to_string(orb) + "_gain").c_str(), 0.0f);
+    }
 
     for (const auto& a : pool.assignments()) {
         if (!a.active) continue;

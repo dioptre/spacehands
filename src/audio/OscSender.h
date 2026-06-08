@@ -14,6 +14,7 @@ public:
     bool connect();
     // Also send /ctrl to Tidal on port 6010
     void connectTidal(const std::string& host = "127.0.0.1", int port = 6010);
+    void* tidalAddr() const { return tidal_; }
     // Send pool assignment state to Tidal
     void sendPool(const class InstrumentPool& pool, const HandList& hands, const MusicParams& p);
     // Called once per frame with full hand list + game state.
