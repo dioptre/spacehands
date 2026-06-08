@@ -73,6 +73,7 @@ int main(int argc, char* argv[]) {
     if (!osc.connect()) {
         std::cerr << "Warning: OSC connection failed — SuperCollider may not be running\n";
     }
+    osc.connectTidal("127.0.0.1", 6010); // also send /ctrl to Tidal
 
     // ---- Servers ----
     // Assets dir: relative to binary (copied by CMake post-build)

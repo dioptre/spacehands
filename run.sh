@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # All-in-one: install deps → download model → build → launch
-# Mac:   Start SuperCollider IDE manually first (runs startup.scd with SuperDirt)
-# Linux: Runs standalone sclang headlessly
+# Starts: SuperCollider + SuperDirt, Tidal (hand-reactive patterns), C++ binary, browser
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 OS="$(uname -s)"
@@ -31,7 +30,7 @@ fi
 # ---- 2. Model ----
 echo ""
 echo "[2/4] Checking model..."
-if [ ! -f "$ROOT/models/yolox-hand-n-192x320.onnx" ]; then
+if [ ! -f "$ROOT/models/yolox-hand-n-192x320.onnx" ] && [ ! -f "$ROOT/models/hand_yolov8n.onnx" ]; then
     echo "  Model not found — downloading..."
     bash "$ROOT/scripts/download_model.sh"
 else
@@ -43,7 +42,7 @@ echo ""
 echo "[3/4] Building..."
 BUILD="$ROOT/build"
 NCPU=$([ "$OS" = "Darwin" ] && sysctl -n hw.ncpu || nproc)
-cmake -S "$ROOT" -B "$BUILD" -DCMAKE_BUILD_TYPE=Release 2>&1 | grep -E "error:|NCNN|liblo|Platform" || true
+cmake -S "$ROOT" -B "$BUILD" -DCMAKE_BUILD_TYPE=Release 2>&1 | grep -E "error:|liblo|Platform" || true
 cmake --build "$BUILD" -j"$NCPU" 2>&1 | tail -3
 
 # ---- 4. Launch ----
@@ -52,47 +51,68 @@ echo "[4/4] Launching..."
 
 CONFIG="$ROOT/config.json"
 SHADER="${SHADER:-wormhole}"
+RESET_TIDAL="${RESET_TIDAL:-0}"  # RESET_TIDAL=1 ./run.sh to kill+restart Tidal
 SC_PID=""
 CHROM_PID=""
 
 if [ "$OS" = "Darwin" ]; then
-    # Mac: expect SuperCollider IDE to already be running with startup.scd
-    # Check if SC is up
+    SCLANG="/Applications/SuperCollider.app/Contents/MacOS/sclang"
+
+    # --- SuperCollider + SuperDirt ---
     if lsof -i UDP:57120 >/dev/null 2>&1; then
-        echo "  SuperCollider running on port 57120 ✓"
+        echo "  SuperCollider already running ✓"
     else
+        echo "  Starting SuperCollider + SuperDirt (this takes ~30s)..."
+        "$SCLANG" ~/Documents/tidal/startup.scd &
+        SC_PID=$!
+        for i in $(seq 45); do
+            sleep 2
+            if lsof -i UDP:57120 >/dev/null 2>&1; then
+                echo "  SuperCollider ready ✓"
+                break
+            fi
+            printf "."
+        done
         echo ""
-        echo "  ┌─────────────────────────────────────────────────────┐"
-        echo "  │  SuperCollider is not running.                      │"
-        echo "  │                                                     │"
-        echo "  │  1. Open SuperCollider IDE                          │"
-        echo "  │  2. Open and run: ~/Documents/tidal/startup.scd    │"
-        echo "  │  3. Re-run this script                              │"
-        echo "  │                                                     │"
-        echo "  │  Or press Enter to continue without audio.         │"
-        echo "  └─────────────────────────────────────────────────────┘"
-        read -r _
     fi
 
+    # --- Tidal --- kill all instances, start fresh with instrument patterns
+    echo "  Killing any running Tidal instances..."
+    pkill -f "ghci" 2>/dev/null || true
+    sleep 2
+
+    echo "  Starting Tidal with instrument patterns..."
+    osascript -e "tell application \"Terminal\"
+        activate
+        do script \"cd ~/Documents/tidal && ghci -ignore-dot-ghci -ghci-script boot-instrument.ghci\"
+    end tell"
+    echo "  Tidal starting (ready in ~15s)..."
+    sleep 15
+    fi
+
+    # --- C++ binary ---
     echo "  Starting instrument binary..."
     cd "$ROOT"
     "$BUILD/instrument" --config "$CONFIG" &
     BIN_PID=$!
     sleep 3
+
     echo "  Opening browser..."
     open "http://localhost:8080/?shader=${SHADER}"
 
 else
-    # Linux/Pi: run SC headless, use real camera config
+    # Linux/Pi
     CONFIG="$ROOT/config.pi.json"
     SCLANG=$(command -v sclang || echo "")
     if [ -n "$SCLANG" ]; then
         echo "  Starting SuperCollider headless..."
-        "$SCLANG" "$ROOT/supercollider/boot.scd" > /tmp/sc_instrument.log 2>&1 &
+        "$SCLANG" ~/Documents/tidal/startup.scd > /tmp/sc_instrument.log 2>&1 &
         SC_PID=$!
+        sleep 10
+        # Start Tidal headless with nohup
+        nohup ghci -ghci-script ~/Documents/tidal/boot-instrument.ghci \
+            > /tmp/tidal_instrument.log 2>&1 &
         sleep 6
-    else
-        echo "  WARNING: sclang not found — audio disabled."
     fi
 
     echo "  Starting instrument binary..."
@@ -111,13 +131,17 @@ fi
 echo ""
 echo "======================================"
 echo "  http://localhost:8080/?shader=${SHADER}"
-echo "  Shaders: wormhole | voronoi | frequency"
-echo "  Press Ctrl+C to stop"
+echo "  Shaders: wormhole | voronoi | frequency | hand | offering"
+echo ""
+echo "  Tidal terminal: type patterns live, e.g."
+echo "    d1 \$ s \"arpy\" # n (cF 0 \"hand0_y\" * 8)"
+echo ""
+echo "  Press Ctrl+C to stop binary (SC/Tidal stay running)"
 echo "======================================"
 
 cleanup() {
-    echo "Shutting down..."
-    kill $BIN_PID ${SC_PID:-} ${CHROM_PID:-} 2>/dev/null
+    echo "Shutting down binary..."
+    kill $BIN_PID ${CHROM_PID:-} 2>/dev/null
     wait 2>/dev/null
     exit 0
 }

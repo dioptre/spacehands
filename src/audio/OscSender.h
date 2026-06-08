@@ -11,6 +11,8 @@ public:
     ~OscSender();
 
     bool connect();
+    // Also send /ctrl to Tidal on port 6010
+    void connectTidal(const std::string& host = "127.0.0.1", int port = 6010);
     // Called once per frame with full hand list + game state.
     // Per-hand: /hand id x y z_mm z_vel gesture_id
     // Then:     /hands_end bucket0 bucket1 ... (active bucket indices this frame)
@@ -21,9 +23,11 @@ private:
     std::string host_;
     int         port_;
 #ifdef HAVE_LIBLO
-    lo_address  addr_ = nullptr;
+    lo_address  addr_  = nullptr;  // scsynth 57120
+    lo_address  tidal_ = nullptr;  // tidal 6010
 #else
-    void*       addr_ = nullptr;
+    void*       addr_  = nullptr;
+    void*       tidal_ = nullptr;
 #endif
 
     MusicParams prev_;

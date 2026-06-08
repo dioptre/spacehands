@@ -33,6 +33,26 @@ bool OscSender::connect() {
     return true;
 }
 
+void OscSender::connectTidal(const std::string& host, int port) {
+#ifdef HAVE_LIBLO
+    tidal_ = lo_address_new(host.c_str(), std::to_string(port).c_str());
+    if (tidal_)
+        std::cout << "[OscSender] Tidal /ctrl → " << host << ":" << port << "\n";
+#endif
+}
+
+// Send /ctrl sf key value to Tidal
+static void sendCtrl(lo_address tidal, const char* key, float val) {
+#ifdef HAVE_LIBLO
+    if (!tidal) return;
+    lo_message m = lo_message_new();
+    lo_message_add_string(m, key);
+    lo_message_add_float(m, val);
+    lo_send_message(tidal, "/ctrl", m);
+    lo_message_free(m);
+#endif
+}
+
 // Build and send a message using the lo_message API (avoids variadic float promotion)
 static void sendMsg(lo_address addr, const char* path,
                     std::initializer_list<std::pair<char, float>> args_f,
@@ -122,6 +142,28 @@ void OscSender::send(const HandList& hands, const MusicParams& p, const GameStat
     lo_send_message(addr_, "/hands_end", me);
     lo_message_free(me);
 #endif
+
+    // Send hand data as /ctrl to Tidal at ~10Hz (not every frame)
+    static int ctrl_count = 0;
+    if (tidal_ && (++ctrl_count % 3 == 0)) {
+        // Per-hand: hand0_x, hand0_y, hand0_z, hand1_x etc.
+        for (size_t i = 0; i < std::min(hands.size(), (size_t)4); ++i) {
+            const auto& h = hands[i];
+            std::string px = "hand" + std::to_string(i) + "_x";
+            std::string py = "hand" + std::to_string(i) + "_y";
+            std::string pz = "hand" + std::to_string(i) + "_z";
+            std::string pg = "hand" + std::to_string(i) + "_g";
+            sendCtrl(tidal_, px.c_str(), h.x);
+            sendCtrl(tidal_, py.c_str(), h.y);
+            sendCtrl(tidal_, pz.c_str(), h.z);
+            sendCtrl(tidal_, pg.c_str(), (float)(int)h.gesture);
+        }
+        // Global controls
+        sendCtrl(tidal_, "num_hands",        (float)hands.size());
+        sendCtrl(tidal_, "progress",         state.progress);
+        sendCtrl(tidal_, "instrument_level", (float)state.level);
+        sendCtrl(tidal_, "tempo",            p.tempo);
+    }
 
     // Global params — throttled
     // Only send level on increase (not on reset to 0 when hands disappear)

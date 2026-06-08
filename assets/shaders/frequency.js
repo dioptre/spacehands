@@ -28,7 +28,8 @@
         fragColor = vec4(0.0);
         vec2 fragCoord = v_uv * u_resolution;
 
-        float norm = length(texture(u_cam, v_uv).rgb) / sqrt(3.0);
+        vec3 camRgb = 1.0 - texture(u_cam, v_uv).rgb; // invert
+        float norm = length(camRgb) / sqrt(3.0);
 
         // Scale max rings with hand count and progress
         float scale = 1.0 + float(u_num_hands) * 0.4 + u_progress * 0.8;

@@ -33,13 +33,16 @@
   <button data-shader="wormhole">wormhole</button>
   <button data-shader="voronoi">voronoi</button>
   <button data-shader="frequency">frequency</button>
+  <button data-shader="hand">hand</button>
+  <button data-shader="offering">offering</button>
+  <button id="mirror-btn" onclick="event.stopPropagation()" style="border-color:rgba(255,255,0,0.4);color:rgba(255,255,0,0.7)">mirror: off</button>
 </div>
 
 <script src="ws_client.js"></script>
 <script>
 // Load shader from ?shader= URL param, default to wormhole
 (function () {
-    const SHADERS = ['wormhole', 'voronoi', 'frequency'];
+    const SHADERS = ['wormhole', 'voronoi', 'frequency', 'hand'];
     const params  = new URLSearchParams(window.location.search);
     let current   = params.get('shader') || 'wormhole';
     if (!SHADERS.includes(current)) current = 'wormhole';
@@ -52,6 +55,8 @@
         document.querySelectorAll('#shader-switcher button').forEach(b => {
             b.classList.toggle('active', b.dataset.shader === name);
         });
+        // Start/stop MJPEG polling based on shader
+        if (window.startMjpeg) window.startMjpeg(name === 'frequency');
         // Update URL without reload
         const url = new URL(window.location);
         url.searchParams.set('shader', name);
@@ -69,7 +74,7 @@
         document.body.appendChild(scriptEl);
     }
 
-    document.querySelectorAll('#shader-switcher button').forEach(b => {
+    document.querySelectorAll('#shader-switcher button[data-shader]').forEach(b => {
         b.addEventListener('click', () => loadShader(b.dataset.shader));
     });
 

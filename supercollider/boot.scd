@@ -39,6 +39,9 @@ Routine({
     // Load OSC responders + create synths (stored in ~instrumentSynths)
     load(instrumentRoot +/+ "instruments.scd");
 
+    // Load game responders (Stellar Offering)
+    load(instrumentRoot +/+ "game.scd");
+
     "=== Instrument ready ===".postln;
 
 }).play;

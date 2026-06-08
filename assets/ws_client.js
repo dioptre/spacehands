@@ -11,11 +11,31 @@ window.camBitmap = null;
     const SSE_URL  = 'http://localhost:8081/state';
     const MJPEG_URL = 'http://localhost:8082/stream.mjpeg';
 
+    // --- Mirror toggle ---
+    window.mirrorX = false;
+    const mirrorBtn = document.getElementById('mirror-btn');
+    if (mirrorBtn) {
+        mirrorBtn.addEventListener('click', () => {
+            window.mirrorX = !window.mirrorX;
+            mirrorBtn.textContent = 'mirror: ' + (window.mirrorX ? 'on' : 'off');
+            mirrorBtn.style.borderColor = window.mirrorX ? 'rgba(255,255,0,0.9)' : 'rgba(255,255,0,0.4)';
+            mirrorBtn.style.color = window.mirrorX ? 'rgba(255,255,0,1)' : 'rgba(255,255,0,0.7)';
+        });
+    }
+
     // --- True SSE push stream at 30Hz from C++ ---
     function connectSSE() {
         const es = new EventSource('http://localhost:8081/state');
         es.onmessage = (e) => {
-            try { Object.assign(window.instrumentState, JSON.parse(e.data)); } catch (_) {}
+            try {
+                const d = JSON.parse(e.data);
+                // Apply mirror flip to hand X coords if enabled
+                if (window.mirrorX && d.hands) {
+                    d.hands = d.hands.map(h => Object.assign({}, h, { x: 1.0 - (h.x || 0) }));
+                    if (d.cx !== undefined) d.cx = 1.0 - d.cx;
+                }
+                Object.assign(window.instrumentState, d);
+            } catch (_) {}
         };
         es.onerror = () => { es.close(); setTimeout(connectSSE, 1000); };
     }
@@ -51,9 +71,10 @@ window.camBitmap = null;
     }
 
     function startMjpegPolling() {
-        console.log('[cam] using MJPEG stream from C++ binary');
+        console.log('[cam] MJPEG polling started');
         const CAM_POLL = 66;
         function poll() {
+            if (!mjpegActive) return; // stop if disabled
             const img = new Image();
             img.crossOrigin = 'anonymous';
             img.onload  = () => { bitmapFrom(img); setTimeout(poll, CAM_POLL); };
@@ -89,9 +110,18 @@ window.camBitmap = null;
         });
     }
 
-    // MJPEG first (hand-masked, processed by C++ binary)
-    // Falls back to browser webcam only if MJPEG unavailable
-    startMjpegPolling();
+    // Expose MJPEG toggle so index.html can start/stop on shader switch
+    let mjpegActive = false;
+    window.startMjpeg = function(enable) {
+        if (enable && !mjpegActive) { mjpegActive = true; startMjpegPolling(); }
+        if (!enable) { mjpegActive = false; window.camBitmap = null; }
+    };
+
+    // Start on load if frequency shader active
+    const params = new URLSearchParams(window.location.search);
+    if ((params.get('shader') || 'wormhole') === 'frequency') {
+        window.startMjpeg(true);
+    }
 
     // --- Debug overlay ---
     const dbg = document.getElementById('debug');
