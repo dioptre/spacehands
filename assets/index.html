@@ -15,7 +15,7 @@
   }
   #shader-switcher {
     position:fixed; bottom:12px; right:12px;
-    display:flex; gap:8px;
+    display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;
   }
   #shader-switcher button {
     background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2);
@@ -24,25 +24,65 @@
   }
   #shader-switcher button:hover { background:rgba(255,255,255,0.2); }
   #shader-switcher button.active { border-color:rgba(255,255,255,0.7); color:#fff; }
+  #crop-ui {
+    position:fixed; bottom:12px; left:12px;
+    display:flex; gap:10px; align-items:center;
+    color:rgba(255,255,255,0.5); font:11px monospace;
+  }
+  #crop-ui label { display:flex; align-items:center; gap:4px; }
+  #crop-ui input {
+    width:50px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2);
+    color:#fff; font:11px monospace; padding:3px 6px; border-radius:3px; text-align:center;
+  }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
 <div id="debug"></div>
+
+<!-- Shader switcher -->
 <div id="shader-switcher">
   <button data-shader="wormhole">wormhole</button>
   <button data-shader="voronoi">voronoi</button>
   <button data-shader="frequency">frequency</button>
   <button data-shader="hand">hand</button>
   <button data-shader="offering">offering</button>
+  <button data-shader="transformation">transformation</button>
   <button id="mirror-btn" onclick="event.stopPropagation()" style="border-color:rgba(255,255,0,0.4);color:rgba(255,255,0,0.7)">mirror: off</button>
+</div>
+
+<!-- Projector crop UI — persisted in localStorage -->
+<div id="crop-ui">
+  <label>L crop: <input type="number" id="crop-left"  value="0" min="0" max="400"></label>
+  <label>R crop: <input type="number" id="crop-right" value="0" min="0" max="400"></label>
 </div>
 
 <script src="ws_client.js"></script>
 <script>
-// Load shader from ?shader= URL param, default to wormhole
 (function () {
-    const SHADERS = ['wormhole', 'voronoi', 'frequency', 'hand'];
+    // ---- Projector crop ----
+    const cropL = document.getElementById('crop-left');
+    const cropR = document.getElementById('crop-right');
+    const canvas = document.getElementById('c');
+
+    function applyCrop() {
+        const l = parseInt(cropL.value) || 0;
+        const r = parseInt(cropR.value) || 0;
+        canvas.style.marginLeft  = l + 'px';
+        canvas.style.marginRight = r + 'px';
+        canvas.style.width = 'calc(100vw - ' + (l+r) + 'px)';
+        localStorage.setItem('cropL', l);
+        localStorage.setItem('cropR', r);
+    }
+    // Restore from localStorage
+    cropL.value = localStorage.getItem('cropL') || '0';
+    cropR.value = localStorage.getItem('cropR') || '0';
+    applyCrop();
+    cropL.addEventListener('input', applyCrop);
+    cropR.addEventListener('input', applyCrop);
+
+    // ---- Shader switcher ----
+    const SHADERS = ['wormhole', 'voronoi', 'frequency', 'hand', 'offering', 'transformation'];
     const params  = new URLSearchParams(window.location.search);
     let current   = params.get('shader') || 'wormhole';
     if (!SHADERS.includes(current)) current = 'wormhole';
@@ -51,24 +91,22 @@
 
     function loadShader(name) {
         current = name;
-        // Update button states
         document.querySelectorAll('#shader-switcher button').forEach(b => {
             b.classList.toggle('active', b.dataset.shader === name);
         });
-        // Start/stop MJPEG polling based on shader
         if (window.startMjpeg) window.startMjpeg(name === 'frequency');
-        // Update URL without reload
         const url = new URL(window.location);
         url.searchParams.set('shader', name);
         window.history.replaceState({}, '', url);
-        // Remove old shader script
         if (scriptEl) scriptEl.remove();
-        // Clear canvas via a new 2D context blank (WebGL context is recreated in shader script)
         const old = document.getElementById('c');
         const fresh = old.cloneNode(false);
+        // Re-apply crop styles to fresh canvas
+        fresh.style.marginLeft  = old.style.marginLeft;
+        fresh.style.marginRight = old.style.marginRight;
+        fresh.style.width       = old.style.width;
         old.parentNode.replaceChild(fresh, old);
         fresh.id = 'c';
-        // Load new shader
         scriptEl = document.createElement('script');
         scriptEl.src = 'shaders/' + name + '.js?t=' + Date.now();
         document.body.appendChild(scriptEl);

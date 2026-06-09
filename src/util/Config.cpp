@@ -24,6 +24,17 @@ Config Config::load(const std::string& path) {
         if (j.contains("yolo_model"))   cfg.yolo_model  = j["yolo_model"];
         if (j.contains("yolo_conf"))    cfg.yolo_conf   = j["yolo_conf"];
         if (j.contains("yolo_iou"))     cfg.yolo_iou    = j["yolo_iou"];
+        if (j.contains("mirror_x"))     cfg.mirror_x    = j["mirror_x"];
+        if (j.contains("coord_x_min"))  cfg.coord_x_min = j["coord_x_min"];
+        if (j.contains("coord_x_max"))  cfg.coord_x_max = j["coord_x_max"];
+        if (j.contains("coord_y_min"))  cfg.coord_y_min = j["coord_y_min"];
+        if (j.contains("coord_y_max"))  cfg.coord_y_max = j["coord_y_max"];
+        if (j.contains("coord_z_min"))  cfg.coord_z_min = j["coord_z_min"];
+        if (j.contains("coord_z_max"))  cfg.coord_z_max = j["coord_z_max"];
+        if (j.contains("hand_x_min"))   cfg.hand_x_min  = j["hand_x_min"];
+        if (j.contains("hand_x_max"))   cfg.hand_x_max  = j["hand_x_max"];
+        if (j.contains("hand_y_min"))   cfg.hand_y_min  = j["hand_y_min"];
+        if (j.contains("hand_y_max"))   cfg.hand_y_max  = j["hand_y_max"];
         if (j.contains("osc_host"))     cfg.osc_host    = j["osc_host"];
         if (j.contains("osc_port"))     cfg.osc_port    = j["osc_port"];
         if (j.contains("ws_port"))      cfg.ws_port     = j["ws_port"];

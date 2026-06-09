@@ -57,7 +57,7 @@ void GestureClassifier::assignIds(HandList& current) {
         next_new_id = std::max(next_new_id, h.id + 1);
 
     for (auto& cur : current) {
-        float best_iou = 0.3f; // minimum IOU to match
+        float best_iou = 0.05f; // low threshold — prioritise ID stability
         int   best_idx = -1;
         cv::Rect2f cur_rect(cur.x - 0.05f, cur.y - 0.05f, 0.1f, 0.1f);
         for (size_t i = 0; i < prev_.size(); ++i) {
@@ -100,11 +100,21 @@ HandList GestureClassifier::classify(const std::vector<Detection>& detections,
     std::sort(hands.begin(), hands.end(), [](const Hand& a, const Hand& b){ return a.x < b.x; });
     assignIds(hands);
 
-    // Z velocity: compare z_mm with same ID in previous frame
+    // Smooth position and Z velocity from previous frame
+    static constexpr float SMOOTH = 0.35f; // lerp speed — lower = smoother
     for (auto& h : hands) {
         auto it = std::find_if(prev_.begin(), prev_.end(),
                                [&](const Hand& p){ return p.id == h.id; });
-        h.z_vel = (it != prev_.end()) ? (h.z_mm - it->z_mm) : 0.f;
+        if (it != prev_.end()) {
+            h.z_vel = h.z_mm - it->z_mm;
+            // Smooth x/y to reduce jitter from bbox size changes
+            h.x  = it->x  + (h.x  - it->x)  * SMOOTH;
+            h.y  = it->y  + (h.y  - it->y)  * SMOOTH;
+            h.bw = it->bw + (h.bw - it->bw) * SMOOTH;
+            h.bh = it->bh + (h.bh - it->bh) * SMOOTH;
+        } else {
+            h.z_vel = 0.f;
+        }
     }
 
     prev_ = hands;

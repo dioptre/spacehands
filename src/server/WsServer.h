@@ -13,7 +13,9 @@ public:
     explicit WsServer(int port);
     void start();
     void stop();
-    void broadcast(const GameStateData& state, const HandList& hands = {});
+    void broadcast(const GameStateData& state, const HandList& hands = {}, bool mirrorX = false,
+                   float xMin=0.f, float xMax=1.f, float yMin=0.f, float yMax=1.f,
+                   float zMin=0.f, float zMax=1.f);
 
 private:
     int         port_;

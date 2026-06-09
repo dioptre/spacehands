@@ -140,47 +140,18 @@ int main(int argc, char* argv[]) {
 
         // Pool: debounced hand arrivals/departures
         // Require ARRIVE_FRAMES consecutive detections before assigning
-        // Require ABSENT_FRAMES consecutive absences before releasing
+        // Pool: direct assign/release — no debounce
         {
-            static constexpr int ARRIVE_FRAMES = 8;  // ~270ms at 30fps
-            static constexpr int ABSENT_FRAMES = 12; // ~400ms at 30fps
-
-            static std::unordered_map<int,int> arriveCount;  // frames seen
-            static std::unordered_map<int,int> absentCount;  // frames absent
-            static std::unordered_set<int>     confirmed;    // assigned to pool
+            static std::unordered_set<int> confirmed;
 
             std::unordered_set<int> curIds;
             for (const auto& h : hands) curIds.insert(h.id);
 
-            // Increment arrive counter for visible hands
-            for (int id : curIds) {
-                arriveCount[id]++;
-                absentCount.erase(id);
-                if (arriveCount[id] >= ARRIVE_FRAMES && !confirmed.count(id)) {
-                    confirmed.insert(id);
-                    pool.assign(id);
-                }
-            }
+            for (int id : curIds)
+                if (!confirmed.count(id)) { confirmed.insert(id); pool.assign(id); }
 
-            // Increment absent counter for missing hands
             for (auto it = confirmed.begin(); it != confirmed.end(); ) {
-                int id = *it;
-                if (!curIds.count(id)) {
-                    absentCount[id]++;
-                    arriveCount.erase(id);
-                    if (absentCount[id] >= ABSENT_FRAMES) {
-                        pool.release(id);
-                        absentCount.erase(id);
-                        it = confirmed.erase(it);
-                        continue;
-                    }
-                }
-                ++it;
-            }
-
-            // Clean up arrive counters for hands that disappeared before confirming
-            for (auto it = arriveCount.begin(); it != arriveCount.end(); ) {
-                if (!curIds.count(it->first)) it = arriveCount.erase(it);
+                if (!curIds.count(*it)) { pool.release(*it); it = confirmed.erase(it); }
                 else ++it;
             }
 
@@ -278,7 +249,12 @@ int main(int argc, char* argv[]) {
         // WebSocket: broadcast full state
         // Embed hands into state for JSON broadcast
         // (WsServer::broadcast takes GameStateData — extend it inline)
-        ws.broadcast(state, hands);
+        // Use classifier hands (stable IOU-tracked IDs, centroid position)
+        // These update every frame with no debounce — smooth cursor movement
+        ws.broadcast(state, hands, cfg.mirror_x,
+                     cfg.coord_x_min, cfg.coord_x_max,
+                     cfg.coord_y_min, cfg.coord_y_max,
+                     cfg.coord_z_min, cfg.coord_z_max);
 
         last_hands = hands;
     }

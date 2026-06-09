@@ -61,13 +61,9 @@ bool MockSource::nextFrame(CameraFrame& out, int /*timeout_ms*/) {
         out.confidence = cv::Mat(h_, w_, CV_32F, cv::Scalar(0.f));
     }
 
-    out.depth = cv::Mat(h_, w_, CV_32F);
-    for (int y = 0; y < h_; ++y)
-        for (int x = 0; x < w_; ++x) {
-            float cx = (x - w_ * 0.5f) / w_;
-            float cy = (y - h_ * 0.5f) / h_;
-            out.depth.at<float>(y, x) = 800.f + 1200.f * (cx*cx + cy*cy);
-        }
+    // Flat depth on Mac — no real ToF data, keep Z stable at ~300mm (near bucket)
+    // so the cursor doesn't flip between near/far layers unpredictably
+    out.depth = cv::Mat(h_, w_, CV_32F, cv::Scalar(300.f));
     ++frame_idx_;
     return true;
 }

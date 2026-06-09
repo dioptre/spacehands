@@ -1,4 +1,5 @@
 #include "WsServer.h"
+#include <algorithm>
 #include <iostream>
 #if __has_include(<nlohmann/json.hpp>)
 #  include <nlohmann/json.hpp>
@@ -9,8 +10,21 @@
 
 WsServer::WsServer(int port) : port_(port) {}
 
-static std::string buildJson(const GameStateData& state, const HandList& hands) {
+// Fixed normaliser — maps observed camera range to 0-1
+struct AxisRange {
+    float lo, hi;
+    AxisRange(float l, float h) : lo(l), hi(h) {}
+    float map(float v) const {
+        if (hi <= lo) return 0.5f;
+        return std::max(0.f, std::min(1.f, (v - lo) / (hi - lo)));
+    }
+};
+
+static std::string buildJson(const GameStateData& state, const HandList& hands, bool mirrorX,
+                              float xMin, float xMax, float yMin, float yMax, float zMin, float zMax) {
     using json = nlohmann::json;
+    AxisRange rx(xMin, xMax), ry(yMin, yMax), rz(zMin, zMax);
+
     json j;
     j["level"]     = state.level;
     j["progress"]  = state.progress;
@@ -19,23 +33,29 @@ static std::string buildJson(const GameStateData& state, const HandList& hands) 
     j["num_hands"] = (int)hands.size();
     j["fx"]        = { {"reverb", state.music.reverb} };
 
-    // Centroid of all hands + per-hand compact data
     float cx = 0, cy = 0;
     json jarr = json::array();
     for (const auto& h : hands) {
-        cx += h.x; cy += h.y;
-        jarr.push_back({ {"x",h.x},{"y",h.y},{"z",h.z},{"g_id",(int)h.gesture},{"bucket",h.bucket} });
+        float rawx = rx.map(h.x);
+        float tx = mirrorX ? (1.f - rawx) : rawx;
+        float ty = ry.map(h.y);
+        float tz = rz.map(h.z);
+        cx += tx; cy += ty;
+        jarr.push_back({ {"x",tx},{"y",ty},{"z",tz},{"g_id",(int)h.gesture},{"bucket",h.bucket} });
     }
     if (!hands.empty()) { cx /= hands.size(); cy /= hands.size(); }
+
+
     j["cx"]    = cx;
     j["cy"]    = cy;
     j["hands"] = jarr;
     return j.dump();
 }
 
-void WsServer::broadcast(const GameStateData& state, const HandList& hands) {
+void WsServer::broadcast(const GameStateData& state, const HandList& hands, bool mirrorX,
+                          float xMin, float xMax, float yMin, float yMax, float zMin, float zMax) {
     std::lock_guard<std::mutex> lk(mutex_);
-    latest_json_ = buildJson(state, hands);
+    latest_json_ = buildJson(state, hands, mirrorX, xMin, xMax, yMin, yMax, zMin, zMax);
 }
 
 void WsServer::start() {
