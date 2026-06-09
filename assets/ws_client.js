@@ -11,6 +11,23 @@ window.camBitmap = null;
     const SSE_URL  = 'http://localhost:8081/state';
     const MJPEG_URL = 'http://localhost:8082/stream.mjpeg';
 
+    // --- Feature toggles (default off) ---
+    window.showLabels = false;
+    window.showHints  = false;
+
+    function wireToggle(id, key, label) {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        btn.addEventListener('click', () => {
+            window[key] = !window[key];
+            btn.textContent = label + ': ' + (window[key] ? 'on' : 'off');
+            btn.style.color = window[key] ? 'rgba(200,200,255,1)' : 'rgba(200,200,255,0.4)';
+            btn.style.borderColor = window[key] ? 'rgba(200,200,255,0.9)' : 'rgba(200,200,255,0.3)';
+        });
+    }
+    wireToggle('toggle-labels', 'showLabels', 'labels');
+    wireToggle('toggle-hints',  'showHints',  'hints');
+
     // --- Mirror toggle ---
     window.mirrorX = false;
     const mirrorBtn = document.getElementById('mirror-btn');

@@ -346,14 +346,15 @@ function updateCellVisuals() {
             if (aliens[i]) aliens[i].visible = false;
             if (labels[i]) labels[i].material.opacity = 0.0;
         } else if (isActive) {
-            // Current target — bright
-            c.mesh.material.color.setHex(0xffffff);
-            c.mesh.material.emissive.setHex(0x4422aa);
-            c.mesh.material.opacity = 0.9;
-            c.wf.material.opacity = 1.0;
-            c.wf.material.color.setHex(0xffffff);
+            // Current target — bright when hints on, otherwise same as future nodes
+            const hintBright = window.showHints !== false;
+            c.mesh.material.color.setHex(hintBright ? 0xffffff : 0x1a2266);
+            c.mesh.material.emissive.setHex(hintBright ? 0x4422aa : 0x0a0f44);
+            c.mesh.material.opacity = hintBright ? 0.9 : 0.5;
+            c.wf.material.opacity = hintBright ? 1.0 : 0.35;
+            c.wf.material.color.setHex(hintBright ? 0xffffff : 0x3355aa);
             if (aliens[i]) aliens[i].visible = true;
-            if (labels[i]) labels[i].material.opacity = 0.9;
+            if (labels[i]) labels[i].material.opacity = (window.showLabels && hintBright) ? 0.9 : 0.0;
         } else if (isDecoy) {
             // Decoy — dimmer blue, alien visible but smaller
             c.mesh.material.color.setHex(0x0a1033);
@@ -371,7 +372,7 @@ function updateCellVisuals() {
             c.wf.material.opacity = 0.35;
             c.wf.material.color.setHex(0x3355aa);
             if (aliens[i]) aliens[i].visible = true;
-            if (labels[i]) labels[i].material.opacity = 0.0; // labels hidden until preview
+            if (labels[i]) labels[i].material.opacity = 0.0;
         }
     }
 
@@ -611,6 +612,12 @@ sequence = shuffle([0,1,2,3,4,5,6,7,8,9,10,11]).slice(0, NUM_NOTES);
 
             if (touching) {
                 holdTimer += dt / HOLD_TIME;
+                // Pulse the active node while hand is over it
+                const activeNode = sequence[collected];
+                if (activeNode !== undefined && cells[activeNode]) {
+                    const s = 1.1 + Math.sin(t * 8) * 0.08;
+                    cells[activeNode].mesh.scale.setScalar(s);
+                }
                 holdRing.position.copy(targetPos);
                 holdRingMat.opacity = 0.8;
                 holdRing.scale.setScalar(holdTimer * 1.2 + 0.8);
