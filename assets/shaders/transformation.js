@@ -48,40 +48,43 @@ for (let i = 0; i < sp.length; i++) sp[i] = (Math.random() - 0.5) * 40;
 starGeo.setAttribute('position', new THREE.BufferAttribute(sp, 3));
 scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0x8855ff, size: 0.025 })));
 
-// ---- Pentatonic notes (MIDI) ----
-const PENTA = [60, 62, 64, 67, 69, 72, 74, 76]; // C4 D4 E4 G4 A4 C5 D5 E5
-const NOTE_NAMES = ['c4','d4','e4','g4','a4','c5','d5','e5'];
+// ---- Pentatonic notes (MIDI) — 12 notes across 2+ octaves ----
+const PENTA = [60, 62, 64, 67, 69, 72, 74, 76, 79, 81, 84, 86];
+const NOTE_NAMES = ['c4','d4','e4','g4','a4','c5','d5','e5','g5','a5','c6','d6'];
 
-// ---- Grid: 2x2x2 = 8 cells ----
-// Cells placed at 25% and 75% of screen in each axis
-// so each cell is in one quadrant of the screen
-const GRID_Z_NEAR = 0.6;
-const GRID_Z_FAR  = -0.6;
-const GRID_POSITIONS = [];
-// Computed after camera setup — placeholder, updated in animate()
-for (let zi = 0; zi < 2; zi++)
-for (let yi = 0; yi < 2; yi++)
-for (let xi = 0; xi < 2; xi++) {
-    GRID_POSITIONS.push(new THREE.Vector3(0, 0, zi === 0 ? GRID_Z_NEAR : GRID_Z_FAR));
+// ---- Sphere of 12 nodes ----
+// Nodes distributed on a sphere using Fibonacci lattice for even coverage
+const NUM_NODES = 12;
+const SPHERE_RADIUS = 1.2;
+const SPHERE_BASE_POSITIONS = []; // unit sphere positions, fixed
+const GRID_POSITIONS = [];        // world positions after rotation, updated each frame
+let sphereRotY = 0;               // current rotation angle
+const SPHERE_ROT_SPEED = 0.04;    // radians per second
+
+// Fibonacci sphere distribution — evenly spaced nodes
+for (let i = 0; i < NUM_NODES; i++) {
+    const phi = Math.acos(1 - 2 * (i + 0.5) / NUM_NODES);
+    const theta = Math.PI * (1 + Math.sqrt(5)) * i;
+    SPHERE_BASE_POSITIONS.push(new THREE.Vector3(
+        Math.sin(phi) * Math.cos(theta),
+        Math.cos(phi),
+        Math.sin(phi) * Math.sin(theta)
+    ));
+    GRID_POSITIONS.push(new THREE.Vector3());
 }
 
-function updateGridPositions() {
-    const fovY = camera.fov * Math.PI / 180;
-    const halfH = Math.tan(fovY / 2) * camera.position.z;
-    const halfW = halfH * camera.aspect;
-    const cx = halfW * 0.5;
-    const gridCentreY = halfH * 0.3;   // shift grid UP — top of alien at screen top
-    const cy = halfH * 0.38;           // vertical spread
-    let idx = 0;
-    for (let zi = 0; zi < 2; zi++)
-    for (let yi = 0; yi < 2; yi++)
-    for (let xi = 0; xi < 2; xi++) {
-        GRID_POSITIONS[idx].set(
-            (xi - 0.5) * cx * 2,
-            gridCentreY + (0.5 - yi) * cy * 2,  // yi=0=top, yi=1=bottom
-            zi === 0 ? GRID_Z_NEAR : GRID_Z_FAR
-        );
-        idx++;
+function updateGridPositions(dt) {
+    sphereRotY += SPHERE_ROT_SPEED * (dt || 0);
+    const cosR = Math.cos(sphereRotY);
+    const sinR = Math.sin(sphereRotY);
+    for (let i = 0; i < NUM_NODES; i++) {
+        const b = SPHERE_BASE_POSITIONS[i];
+        // Rotate around Y axis
+        GRID_POSITIONS[i].set(
+            b.x * cosR + b.z * sinR,
+            b.y,
+            -b.x * sinR + b.z * cosR
+        ).multiplyScalar(SPHERE_RADIUS);
     }
 }
 
@@ -100,7 +103,8 @@ function handWorldPos(hx, hy, hz) {
 
     const mx = (hxAdj - 0.5) * halfW * 2;
     const my = -(hy - 0.5) * halfH * 2;
-    const wz = hz < 0.5 ? GRID_Z_NEAR : GRID_Z_FAR;
+    // Z maps linearly through sphere depth range
+    const wz = (hz - 0.5) * SPHERE_RADIUS * 2.5;
     return new THREE.Vector3(mx, my, wz);
 }
 
@@ -114,10 +118,17 @@ let idleTimer = 0;
 let climaxTimer = 0;
 let congratsTimer = 0;
 let frozenHandPos = null;
-let hasSeenPreview = false; // show sequence preview once per session
-let previewStep = 0;        // which cell we're previewing
-let previewTimer = 0;       // time on current preview cell
-const PREVIEW_STEP_TIME = 0.7; // seconds per cell
+let hasSeenPreview = false; // whether preview shown this cycle
+let previewStep = 0;
+let previewTimer = 0;
+let lastPreviewTime = -999; // clock time of last preview (so first one always shows)
+let sequenceAge = 0;        // how long current sequence has been active
+const NUM_NOTES = 6;  // notes to collect out of NUM_NODES
+const PREVIEW_STEP_TIME = 0.7;
+const PREVIEW_COOLDOWN = 40;     // seconds between previews
+const SEQUENCE_RESHUFFLE = 180;  // seconds before new sequence (3 min)
+const PLAYING_IDLE_RESET = 8.0;  // seconds without hands during PLAYING before reset
+const IDLE_PREVIEW_DELAY = 0.5;  // seconds after hand enters IDLE before starting preview
 
 function shuffle(arr) {
     const a = [...arr];
@@ -129,14 +140,17 @@ function shuffle(arr) {
 }
 
 function resetGame() {
-    sequence = shuffle([0,1,2,3,4,5,6,7]);
+    // Pick 6 random nodes from 12 to be note targets
+sequence = shuffle([0,1,2,3,4,5,6,7,8,9,10,11]).slice(0, NUM_NOTES);
     collected = 0;
     holdTimer = 0;
     idleTimer = 0;
     frozenHandPos = null;
-    hasSeenPreview = false; // allow preview again after full reset
+    hasSeenPreview = false;
+    lastPreviewTime = -999; // force preview on next hand
     previewStep = 0;
     previewTimer = 0;
+    sequenceAge = 0;
     updateCellVisuals();
     updateMelody();
     state = States.IDLE;
@@ -156,7 +170,7 @@ function sendOsc(key, val) {
 function updateMelody() {
     // Send collected notes as space-separated note string to Tidal
     if (collected === 0) { sendOsc('transformation_active', 0); return; }
-    const notes = sequence.slice(0, collected).map(i => NOTE_NAMES[i]).join(' ');
+    const notes = sequence.slice(0, collected).map(idx => NOTE_NAMES[idx]).join(' ');
     sendOsc('transformation_notes', notes);
     sendOsc('transformation_active', 1);
     sendOsc('transformation_count', collected);
@@ -170,7 +184,7 @@ const HOLD_TIME = 0.6;
 const TOUCH_XY = 0.9;
 const TOUCH_Z  = 0.8;
 
-for (let i = 0; i < 8; i++) {
+for (let i = 0; i < NUM_NODES; i++) {
     const geo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
     const mat = new THREE.MeshStandardMaterial({
         color: 0x2244aa,
@@ -216,7 +230,7 @@ function makeLabel(text) {
 }
 
 const labels = [];
-for (let i = 0; i < 8; i++) {
+for (let i = 0; i < NUM_NODES; i++) {
     const lbl = makeLabel(NOTE_NAMES[sequence[i] || i]);
     lbl.position.copy(GRID_POSITIONS[i]);
     lbl.position.y += 0.7;
@@ -228,7 +242,7 @@ for (let i = 0; i < 8; i++) {
 const loader = new GLTFLoader();
 const aliens = [];
 loader.load('models/alien.glb', (gltf) => {
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < NUM_NODES; i++) {
         const a = gltf.scene.clone(true);
         const box = new THREE.Box3().setFromObject(a);
         const size = box.getSize(new THREE.Vector3());
@@ -280,7 +294,7 @@ const progressBar = document.createElement('div');
 progressBar.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:8px;pointer-events:none;';
 document.body.appendChild(progressBar);
 const progSegments = [];
-for (let i = 0; i < 8; i++) {
+for (let i = 0; i < NUM_NOTES; i++) {
     const seg = document.createElement('div');
     seg.style.cssText = 'width:32px;height:12px;border:1px solid rgba(100,150,255,0.5);border-radius:3px;background:rgba(20,30,80,0.7);transition:background 0.3s;';
     progressBar.appendChild(seg);
@@ -309,41 +323,65 @@ congratsOverlay.innerHTML = \`
 document.body.appendChild(congratsOverlay);
 
 function updateCellVisuals() {
-    for (let i = 0; i < 8; i++) {
+    // sequence = array of NUM_NOTES node indices (e.g. [3,7,1,9,5,11])
+    // collected = how many have been collected so far
+    // Active target = sequence[collected] = the node index to hit next
+
+    for (let i = 0; i < NUM_NODES; i++) {
         const c = cells[i];
-        const noteIdx = sequence[i];
-        const isActive = (i === collected && state === States.PLAYING);
-        const isCollected = (i < collected);
+        const seqPos = sequence.indexOf(i); // -1 if not in sequence (decoy)
+        const isDecoy    = seqPos === -1;
+        const isCollected = seqPos !== -1 && seqPos < collected;
+        const isActive   = seqPos === collected && state === States.PLAYING;
+
+        c.mesh.scale.setScalar(1.0);
 
         if (isCollected) {
+            // Already collected — dark, no alien
             c.mesh.material.color.setHex(0x001122);
             c.mesh.material.emissive.setHex(0x000811);
-            c.mesh.material.opacity = 0.25;
-            c.wf.material.opacity = 0.15;
-            c.mesh.scale.setScalar(0.85);
+            c.mesh.material.opacity = 0.2;
+            c.wf.material.opacity = 0.1;
+            c.mesh.scale.setScalar(0.8);
             if (aliens[i]) aliens[i].visible = false;
-            if (labels[i]) labels[i].material.opacity = 0.2;
-            progSegments[i].style.background = 'rgba(80,120,255,0.9)';
+            if (labels[i]) labels[i].material.opacity = 0.0;
         } else if (isActive) {
+            // Current target — bright
             c.mesh.material.color.setHex(0xffffff);
             c.mesh.material.emissive.setHex(0x4422aa);
-            c.mesh.material.opacity = 0.85;
+            c.mesh.material.opacity = 0.9;
             c.wf.material.opacity = 1.0;
             c.wf.material.color.setHex(0xffffff);
-            if (labels[i]) {
-                labels[i].material.opacity = 1.0;
-                makeLabel(NOTE_NAMES[noteIdx]);
-            }
-            progSegments[i].style.background = 'rgba(180,180,255,0.5)';
+            if (aliens[i]) aliens[i].visible = true;
+            if (labels[i]) labels[i].material.opacity = 0.9;
+        } else if (isDecoy) {
+            // Decoy — dimmer blue, alien visible but smaller
+            c.mesh.material.color.setHex(0x0a1033);
+            c.mesh.material.emissive.setHex(0x050818);
+            c.mesh.material.opacity = 0.35;
+            c.wf.material.opacity = 0.2;
+            c.wf.material.color.setHex(0x223355);
+            if (aliens[i]) aliens[i].visible = true;
+            if (labels[i]) labels[i].material.opacity = 0.0; // no label on decoys
         } else {
+            // Future note in sequence — medium blue
             c.mesh.material.color.setHex(0x1a2266);
             c.mesh.material.emissive.setHex(0x0a0f44);
-            c.mesh.material.opacity = 0.55;
-            c.wf.material.opacity = 0.4;
-            c.wf.material.color.setHex(0x4466ff);
-            c.mesh.scale.setScalar(1.0);
+            c.mesh.material.opacity = 0.5;
+            c.wf.material.opacity = 0.35;
+            c.wf.material.color.setHex(0x3355aa);
             if (aliens[i]) aliens[i].visible = true;
-            if (labels[i]) labels[i].material.opacity = 0.5;
+            if (labels[i]) labels[i].material.opacity = 0.0; // labels hidden until preview
+        }
+    }
+
+    // Update progress bar (only NUM_NOTES segments)
+    for (let i = 0; i < NUM_NOTES; i++) {
+        if (i < collected) {
+            progSegments[i].style.background = 'rgba(80,120,255,0.9)';
+        } else if (i === collected) {
+            progSegments[i].style.background = 'rgba(180,180,255,0.5)';
+        } else {
             progSegments[i].style.background = 'rgba(20,30,80,0.7)';
         }
     }
@@ -385,18 +423,7 @@ function resize() {
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
-    updateGridPositions();
-    // Update cell and alien positions
-    cells.forEach((c, i) => {
-        c.mesh.position.copy(GRID_POSITIONS[i]);
-        c.wf.position.copy(GRID_POSITIONS[i]);
-    });
-    labels.forEach((l, i) => {
-        if (l) { l.position.copy(GRID_POSITIONS[i]); l.position.y += 0.5; }
-    });
-    aliens.forEach((a, i) => {
-        if (a) { a.position.copy(GRID_POSITIONS[i]); a.position.y += 0.6; }
-    });
+    // Positions update each frame via animate() — no static update needed on resize
 }
 window.addEventListener('resize', resize); resize();
 
@@ -417,20 +444,50 @@ function animate() {
     // Rotate stars
     scene.children.forEach(c => { if (c.isPoints) c.rotation.y += 0.0001; });
 
+    // Update sphere node positions (rotation)
+    updateGridPositions(dt);
+
+    // Update cell/alien/label world positions to match rotating sphere
+    cells.forEach((c, i) => {
+        c.mesh.position.copy(GRID_POSITIONS[i]);
+        c.wf.position.copy(GRID_POSITIONS[i]);
+    });
+    labels.forEach((l, i) => {
+        if (l) { l.position.copy(GRID_POSITIONS[i]); l.position.y += 0.55; }
+    });
+
     // Bob aliens
     aliens.forEach((a, i) => {
         if (a && a.visible) {
-            a.position.y = GRID_POSITIONS[i].y + 0.8 + Math.sin(t * 1.2 + i * 0.8) * 0.12;
+            // Follow sphere node + bob above it
+            a.position.set(
+                GRID_POSITIONS[i].x,
+                GRID_POSITIONS[i].y + 0.55 + Math.sin(t * 1.2 + i * 0.8) * 0.08,
+                GRID_POSITIONS[i].z
+            );
             a.rotation.y += 0.008;
         }
     });
 
     // ---- State machine ----
+    // Reshuffle sequence periodically (resets collected progress)
+    sequenceAge += dt;
+    if (sequenceAge >= SEQUENCE_RESHUFFLE && state === States.IDLE && numHands === 0) {
+        // Pick 6 random nodes from 12 to be note targets
+sequence = shuffle([0,1,2,3,4,5,6,7,8,9,10,11]).slice(0, NUM_NOTES);
+        sequenceAge = 0;
+        hasSeenPreview = false; // allow preview of new sequence
+        updateCellVisuals();
+        console.log('[transform] new sequence generated');
+    }
+
     if (state === States.IDLE) {
         if (numHands > 0) {
-            if (!hasSeenPreview) {
-                // First hand this session — show sequence preview
-                console.log('[transform] starting sequence preview, hasSeenPreview=', hasSeenPreview);
+            const now = clock.getElapsedTime();
+            const canPreview = (now - lastPreviewTime) >= PREVIEW_COOLDOWN;
+            if (canPreview) {
+                // Show preview — either first time or cooldown elapsed
+                console.log('[transform] starting sequence preview');
                 state = States.SEQUENCE_PREVIEW;
                 previewStep = 0;
                 previewTimer = 0;
@@ -452,7 +509,7 @@ function animate() {
         previewTimer += dt;
         // Light up current preview cell
         cells.forEach((c, i) => {
-            if (i === previewStep) {
+            if (i === sequence[previewStep]) {
                 c.mesh.material.color.setHex(0xffffff);
                 c.mesh.material.emissive.setHex(0x6633ff);
                 c.mesh.material.opacity = 1.0;
@@ -483,9 +540,10 @@ function animate() {
                 body: JSON.stringify({ midi: MIDI[noteIdx], amp: 0.75, decay: 0.9 })
             }).catch(() => {});
             previewStep++;
-            if (previewStep >= 8) {
+            if (previewStep >= NUM_NOTES) {
                 // Preview complete — start game
                 hasSeenPreview = true;
+                lastPreviewTime = clock.getElapsedTime();
                 updateCellVisuals();
                 state = States.PLAYING;
             }
@@ -495,7 +553,7 @@ function animate() {
     else if (state === States.PLAYING) {
         if (numHands === 0) {
             idleTimer += dt;
-            if (idleTimer > 2.0) resetGame();
+            if (idleTimer > PLAYING_IDLE_RESET) resetGame();
         } else {
             idleTimer = 0;
         }
@@ -513,7 +571,8 @@ function animate() {
 
         // Touch detection
         if (collected < 8) {
-            const targetPos = GRID_POSITIONS[collected];
+            const targetNodeIdx = sequence[collected]; // which sphere node is the target
+            const targetPos = GRID_POSITIONS[targetNodeIdx];
             let touching = false;
             let gesture = 0;
 
@@ -562,9 +621,9 @@ function animate() {
 
             if (holdTimer >= 1.0) {
                 // COLLECTED! Play same note as preview via /note
-                burstParticles(GRID_POSITIONS[collected]);
+                burstParticles(GRID_POSITIONS[sequence[collected]]);
                 const MIDI = [60, 62, 64, 67, 69, 72, 74, 76];
-                const collectedMidi = MIDI[sequence[collected]];
+                const collectedMidi = PENTA[sequence[collected]];
                 fetch('http://localhost:8080/note', {
                     method: 'POST',
                     headers: {'Content-Type':'application/json'},
@@ -577,7 +636,7 @@ function animate() {
                 updateCellVisuals();
                 updateMelody();
 
-                if (collected >= 8) {
+                if (collected >= NUM_NOTES) {
                     state = States.CLIMAX;
                     climaxTimer = 0;
                     sendOsc('transformation_climax', 1);
