@@ -303,8 +303,15 @@ for (let i = 0; i < NUM_NOTES; i++) {
 
 // ---- Congratulations overlay ----
 const congratsOverlay = document.createElement('div');
+// Respect L/R crop — position within the visible canvas area
+function getCropStyle() {
+    const l = parseInt(document.getElementById('crop-left')?.value || 0);
+    const r = parseInt(document.getElementById('crop-right')?.value || 0);
+    return \`left:\${l}px;right:\${r}px;width:auto;\`;
+}
 congratsOverlay.style.cssText = \`
-    position:fixed;top:0;left:0;width:100%;height:100%;
+    position:fixed;top:0;height:100%;
+    \${getCropStyle()}
     display:none;align-items:center;justify-content:center;flex-direction:column;
     background:rgba(0,0,0,0);pointer-events:none;z-index:100;
     font-family:monospace;text-align:center;transition:opacity 1s;opacity:0;
@@ -321,6 +328,101 @@ congratsOverlay.innerHTML = \`
     </div>
 \`;
 document.body.appendChild(congratsOverlay);
+
+// ---- Frequency canvas overlay for ending sequence ----
+const freqCanvas = document.createElement('canvas');
+freqCanvas.style.cssText = \`
+    position:fixed;top:0;left:0;right:0;width:100%;height:100%;
+    display:none;pointer-events:none;z-index:90;opacity:0;
+\`;
+document.body.appendChild(freqCanvas);
+
+const freqGL = freqCanvas.getContext('webgl2');
+let freqProg = null;
+let freqBuf = null;
+
+if (freqGL) {
+    const fVERT = \`#version 300 es
+    in vec2 a_pos; out vec2 v_uv;
+    void main() { v_uv=a_pos*0.5+0.5; gl_Position=vec4(a_pos,0,1); }\`;
+
+    const fFRAG = \`#version 300 es
+    precision highp float;
+    in vec2 v_uv; out vec4 fragColor;
+    uniform float u_time;
+    uniform vec2 u_resolution;
+    uniform vec2 u_offset; // crop offset in pixels
+
+    void main() {
+        fragColor = vec4(0.0);
+        vec2 fragCoord = v_uv * u_resolution;
+        // Expanding circle from centre, grows over 7s then stays full
+        float ramp = clamp(u_time / 7.0, 0.0, 1.0);
+        float expand = ramp * ramp * (3.0 - 2.0 * ramp);
+        vec2 centre = u_resolution * 0.5;
+        float maxRadius = length(u_resolution) * 0.8;
+        float dist = length(fragCoord - centre);
+        float edgeR = expand * maxRadius;
+        float edge = smoothstep(edgeR, edgeR - 60.0, dist);
+        if (edge < 0.01) { fragColor = vec4(0.0); return; }
+
+        // Stable ring density — never drops to zero
+        float norm = 0.5 + 0.15 * sin(u_time * 0.3) + 0.08 * sin(u_time * 0.71);
+        int count = int(120.0 * norm);
+        count = min(count, 160);
+        for (int s = 0; s < count; s++) {
+            vec2 R = u_resolution;
+            vec2 u2 = (fragCoord * 2.0 - R + vec2(s % 8, s / 8) / 4.0 - 2.0) / R.x;
+            u2 = floor((6.0 - vec2(atan(u2.y, u2.x) / 3.0, length(u2))) * R) + 0.5;
+            fragColor += max(
+                1.0 - fract(vec4(7,6,4,0) * 0.02
+                    + (u2.y * 0.02 + u2.x * 0.4) * fract(u2.x * 0.61)
+                    + u_time) * 5.0,
+                0.0) / 64.0;
+        }
+        fragColor *= edge;
+    }\`;
+
+    const compileF = (src, type) => {
+        const s = freqGL.createShader(type);
+        freqGL.shaderSource(s, src); freqGL.compileShader(s);
+        if (!freqGL.getShaderParameter(s, freqGL.COMPILE_STATUS)) console.error(freqGL.getShaderInfoLog(s));
+        return s;
+    };
+    freqProg = freqGL.createProgram();
+    freqGL.attachShader(freqProg, compileF(fVERT, freqGL.VERTEX_SHADER));
+    freqGL.attachShader(freqProg, compileF(fFRAG, freqGL.FRAGMENT_SHADER));
+    freqGL.linkProgram(freqProg);
+
+    freqBuf = freqGL.createBuffer();
+    freqGL.bindBuffer(freqGL.ARRAY_BUFFER, freqBuf);
+    freqGL.bufferData(freqGL.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,-1,1,1,-1,1]), freqGL.STATIC_DRAW);
+}
+
+function renderFreq(t, congratsAge) {
+    if (!freqGL || !freqProg) return;
+    const w = freqCanvas.clientWidth, h = freqCanvas.clientHeight;
+    if (freqCanvas.width !== w || freqCanvas.height !== h) {
+        freqCanvas.width = w; freqCanvas.height = h;
+    }
+    freqGL.viewport(0, 0, w, h);
+    freqGL.useProgram(freqProg);
+    const loc = freqGL.getAttribLocation(freqProg, 'a_pos');
+    freqGL.bindBuffer(freqGL.ARRAY_BUFFER, freqBuf);
+    freqGL.enableVertexAttribArray(loc);
+    freqGL.vertexAttribPointer(loc, 2, freqGL.FLOAT, false, 0, 0);
+    freqGL.uniform1f(freqGL.getUniformLocation(freqProg, 'u_time'), congratsAge);
+    freqGL.uniform2f(freqGL.getUniformLocation(freqProg, 'u_resolution'), w, h);
+    // Centre = middle of visible (cropped) area
+    const cropL = parseInt(document.getElementById('crop-left')?.value || 0);
+    const cropR = parseInt(document.getElementById('crop-right')?.value || 0);
+    const visW = w - cropL - cropR;
+    // Shift: visible centre is at cropL + visW/2, canvas centre is w/2
+    // offset = (cropL + visW/2) - w/2
+    const offsetX = (cropL + visW * 0.5) - w * 0.5;
+    freqGL.uniform2f(freqGL.getUniformLocation(freqProg, 'u_offset'), offsetX, 0);
+    freqGL.drawArrays(freqGL.TRIANGLES, 0, 6);
+}
 
 function updateCellVisuals() {
     // sequence = array of NUM_NOTES node indices (e.g. [3,7,1,9,5,11])
@@ -538,7 +640,7 @@ sequence = shuffle([0,1,2,3,4,5,6,7,8,9,10,11]).slice(0, NUM_NOTES);
             fetch('http://localhost:8080/note', {
                 method: 'POST',
                 headers: {'Content-Type':'application/json'},
-                body: JSON.stringify({ midi: MIDI[noteIdx], amp: 0.75, decay: 0.9 })
+                body: JSON.stringify({ midi: MIDI[noteIdx], amp: 0.75, decay: 0.4 })
             }).catch(() => {});
             previewStep++;
             if (previewStep >= NUM_NOTES) {
@@ -634,7 +736,7 @@ sequence = shuffle([0,1,2,3,4,5,6,7,8,9,10,11]).slice(0, NUM_NOTES);
                 fetch('http://localhost:8080/note', {
                     method: 'POST',
                     headers: {'Content-Type':'application/json'},
-                    body: JSON.stringify({ midi: collectedMidi, amp: 0.8, decay: 1.0 })
+                    body: JSON.stringify({ midi: collectedMidi, amp: 0.8, decay: 0.4 })
                 }).catch(() => {});
                 sendOsc('transformation_note', collectedMidi); // also update Tidal loop
                 collected++;
@@ -655,27 +757,57 @@ sequence = shuffle([0,1,2,3,4,5,6,7,8,9,10,11]).slice(0, NUM_NOTES);
     else if (state === States.CLIMAX) {
         climaxTimer += dt;
         const p = Math.min(climaxTimer / 3.5, 1);
-        wormholeRing.scale.setScalar(0.01 + p * 6);
+        // Wormhole ring expands
+        wormholeRing.scale.setScalar(0.01 + p * 8);
         wormholeRing.material.opacity = Math.sin(p * Math.PI) * 0.9;
         wormholeRing.rotation.z += 0.03;
         wormholeRing.rotation.x += 0.015;
+        // Scene fades to black as ring passes over
+        renderer.setClearColor(0x000000, p);
+        // Frequency starts expanding from first frame of CLIMAX (show once)
+        if (climaxTimer < 0.05) {
+            // Match freqCanvas exactly to the main canvas (same crop)
+            const mainCanvas = document.getElementById('c');
+            freqCanvas.style.left   = mainCanvas.style.marginLeft || '0px';
+            freqCanvas.style.right  = 'auto';
+            freqCanvas.style.width  = mainCanvas.clientWidth + 'px';
+            freqCanvas.style.top    = '0px';
+            freqCanvas.style.height = '100%';
+            freqCanvas.style.display = 'block';
+            freqCanvas.style.opacity = 0;
+            freqCanvas.style.transition = 'opacity 1s';
+            setTimeout(() => { freqCanvas.style.opacity = 1; }, 50);
+        }
+        renderFreq(t, climaxTimer);
         if (climaxTimer > 3.5) {
             state = States.CONGRATULATIONS;
             congratsTimer = 0;
+            // Re-apply crop to overlay
+            const l = parseInt(document.getElementById('crop-left')?.value || 0);
+            const r = parseInt(document.getElementById('crop-right')?.value || 0);
+            congratsOverlay.style.left = l + 'px';
+            congratsOverlay.style.right = r + 'px';
             congratsOverlay.style.display = 'flex';
-            setTimeout(() => { congratsOverlay.style.opacity = 1; }, 50);
+            setTimeout(() => { congratsOverlay.style.opacity = 1; }, 0);
         }
     }
 
     else if (state === States.CONGRATULATIONS) {
         congratsTimer += dt;
-        wormholeRing.rotation.z += 0.02;
-        if (congratsTimer > 5.0) {
+        // Continue frequency animation — time starts from CLIMAX begin (3.5 + congratsTimer)
+        renderFreq(t, 3.5 + congratsTimer);
+
+        if (congratsTimer > 15.0) {
+            // Fade out frequency canvas and text
+            freqCanvas.style.transition = 'opacity 1.5s';
+            freqCanvas.style.opacity = 0;
             congratsOverlay.style.opacity = 0;
             setTimeout(() => {
                 congratsOverlay.style.display = 'none';
+                freqCanvas.style.display = 'none';
+                renderer.setClearColor(0x000008, 1);
                 resetGame();
-            }, 1000);
+            }, 1500);
         }
     }
 
@@ -685,6 +817,14 @@ sequence = shuffle([0,1,2,3,4,5,6,7,8,9,10,11]).slice(0, NUM_NOTES);
 // Init
 resetGame();
 animate();
+
+// Expose ending trigger for test button
+window.triggerEnding = () => {
+    state = States.CLIMAX;
+    climaxTimer = 0;
+    sendOsc('transformation_climax', 1);
+    console.log('[transformation] ending triggered manually');
+};
 `;
     document.body.appendChild(mod);
 })();
