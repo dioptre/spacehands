@@ -27,6 +27,8 @@ window.camBitmap = null;
     }
     wireToggle('toggle-labels', 'showLabels', 'labels');
     wireToggle('toggle-hints',  'showHints',  'hints');
+    window.showPulse = false;
+    wireToggle('toggle-pulse',  'showPulse',  'pulse');
 
     // --- Mirror toggle ---
     window.mirrorX = false;

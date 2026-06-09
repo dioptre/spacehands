@@ -296,6 +296,7 @@ handLoader.load('models/hand.glb', (gltf) => {
 const holdRingGeo = new THREE.TorusGeometry(0.55, 0.04, 8, 48);
 const holdRingMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 });
 const holdRing = new THREE.Mesh(holdRingGeo, holdRingMat);
+holdRing.position.set(0, -999, 0); // park off-screen
 scene.add(holdRing);
 
 // ---- Beam line (PINCH gesture preview) ----
@@ -748,18 +749,22 @@ sequence = shuffle([0,1,2,3,4,5,6,7,8,9,10,11]).slice(0, NUM_NOTES);
 
             if (touching) {
                 holdTimer += dt / HOLD_TIME;
-                // Pulse the active node while hand is over it
-                const activeNode = sequence[collected];
-                if (activeNode !== undefined && cells[activeNode]) {
-                    const s = 1.1 + Math.sin(t * 8) * 0.08;
-                    cells[activeNode].mesh.scale.setScalar(s);
+                // Pulse only when enabled (default off = hard mode)
+                if (window.showPulse === true) {
+                    const activeNode = sequence[collected];
+                    if (activeNode !== undefined && cells[activeNode]) {
+                        const s = 1.1 + Math.sin(t * 8) * 0.08;
+                        cells[activeNode].mesh.scale.setScalar(s);
+                    }
                 }
-                holdRing.position.copy(targetPos);
-                holdRingMat.opacity = 0.8;
-                holdRing.scale.setScalar(holdTimer * 1.2 + 0.8);
+                if (window.showPulse === true) {
+                    holdRing.position.copy(targetPos);
+                    holdRingMat.opacity = 0.8;
+                    holdRing.scale.setScalar(holdTimer * 1.2 + 0.8);
+                }
             } else {
                 holdTimer = Math.max(0, holdTimer - dt * 2);
-                holdRingMat.opacity = holdTimer * 0.5;
+                holdRingMat.opacity = window.showPulse === true ? holdTimer * 0.5 : 0;
             }
 
             if (holdTimer >= 1.0) {
