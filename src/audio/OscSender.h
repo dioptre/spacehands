@@ -14,6 +14,7 @@ public:
     bool connect();
     // Also send /ctrl to Tidal on port 6010
     void connectTidal(const std::string& host = "127.0.0.1", int port = 6010);
+    void silenceAllOrbits();
     void* tidalAddr() const { return tidal_; }
     // Send pool assignment state to Tidal
     void sendPool(const class InstrumentPool& pool, const HandList& hands, const MusicParams& p);
@@ -21,7 +22,7 @@ public:
     // Per-hand: /hand id x y z_mm z_vel gesture_id
     // Then:     /hands_end bucket0 bucket1 ... (active bucket indices this frame)
     // Global:   /tempo /fx /level /mute on change
-    void send(const HandList& hands, const MusicParams& p, const GameStateData& state);
+    void send(const HandList& hands, const MusicParams& p, const GameStateData& state, bool scInstruments = true);
 
 private:
     std::string host_;

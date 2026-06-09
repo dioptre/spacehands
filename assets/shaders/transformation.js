@@ -105,15 +105,19 @@ function handWorldPos(hx, hy, hz) {
 }
 
 // ---- Game state ----
-const States = { IDLE: 0, PLAYING: 1, CLIMAX: 2, CONGRATULATIONS: 3 };
+const States = { IDLE: 0, SEQUENCE_PREVIEW: 4, PLAYING: 1, CLIMAX: 2, CONGRATULATIONS: 3 };
 let state = States.IDLE;
-let sequence = [];       // shuffled note indices [0-7]
-let collected = 0;       // how many notes collected so far
-let holdTimer = 0;       // current hold progress 0-1
+let sequence = [];
+let collected = 0;
+let holdTimer = 0;
 let idleTimer = 0;
 let climaxTimer = 0;
 let congratsTimer = 0;
-let frozenHandPos = null; // FIST gesture freeze
+let frozenHandPos = null;
+let hasSeenPreview = false; // show sequence preview once per session
+let previewStep = 0;        // which cell we're previewing
+let previewTimer = 0;       // time on current preview cell
+const PREVIEW_STEP_TIME = 0.7; // seconds per cell
 
 function shuffle(arr) {
     const a = [...arr];
@@ -130,6 +134,9 @@ function resetGame() {
     holdTimer = 0;
     idleTimer = 0;
     frozenHandPos = null;
+    hasSeenPreview = false; // allow preview again after full reset
+    previewStep = 0;
+    previewTimer = 0;
     updateCellVisuals();
     updateMelody();
     state = States.IDLE;
@@ -418,20 +425,71 @@ function animate() {
         }
     });
 
-    // Active cell pulse
-    if (state === States.PLAYING && collected < 8) {
-        const s = 1.15 + Math.sin(t * 4) * 0.12;
-        cells[collected].mesh.scale.setScalar(s);
-        cells[collected].wf.scale.setScalar(s);
-    }
-
     // ---- State machine ----
     if (state === States.IDLE) {
         if (numHands > 0) {
-            state = States.PLAYING;
+            if (!hasSeenPreview) {
+                // First hand this session — show sequence preview
+                console.log('[transform] starting sequence preview, hasSeenPreview=', hasSeenPreview);
+                state = States.SEQUENCE_PREVIEW;
+                previewStep = 0;
+                previewTimer = 0;
+                // Dim all cells for preview
+                cells.forEach(c => {
+                    c.mesh.material.color.setHex(0x001122);
+                    c.mesh.material.opacity = 0.2;
+                    c.wf.material.opacity = 0.1;
+                });
+            } else {
+                state = States.PLAYING;
+            }
             idleTimer = 0;
         }
         idleTimer += dt;
+    }
+
+    else if (state === States.SEQUENCE_PREVIEW) {
+        previewTimer += dt;
+        // Light up current preview cell
+        cells.forEach((c, i) => {
+            if (i === previewStep) {
+                c.mesh.material.color.setHex(0xffffff);
+                c.mesh.material.emissive.setHex(0x6633ff);
+                c.mesh.material.opacity = 1.0;
+                c.wf.material.color.setHex(0xffffff);
+                c.wf.material.opacity = 1.0;
+                c.mesh.scale.setScalar(1.2 + Math.sin(t * 8) * 0.08);
+            } else if (i < previewStep) {
+                // Already shown — dim but leave visible
+                c.mesh.material.color.setHex(0x112244);
+                c.mesh.material.opacity = 0.35;
+                c.wf.material.opacity = 0.2;
+            } else {
+                c.mesh.material.color.setHex(0x001122);
+                c.mesh.material.opacity = 0.15;
+                c.wf.material.opacity = 0.08;
+            }
+        });
+
+        if (previewTimer >= PREVIEW_STEP_TIME) {
+            previewTimer = 0;
+            console.log('[transform] preview step', previewStep, 'of 8');
+            // Play this cell's note as a clean one-shot directly in SC
+            const noteIdx = sequence[previewStep];
+            const MIDI = [60, 62, 64, 67, 69, 72, 74, 76]; // C4 D4 E4 G4 A4 C5 D5 E5
+            fetch('http://localhost:8080/note', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ midi: MIDI[noteIdx], amp: 0.75, decay: 0.9 })
+            }).catch(() => {});
+            previewStep++;
+            if (previewStep >= 8) {
+                // Preview complete — start game
+                hasSeenPreview = true;
+                updateCellVisuals();
+                state = States.PLAYING;
+            }
+        }
     }
 
     else if (state === States.PLAYING) {
@@ -488,21 +546,8 @@ function animate() {
                     if (gesture === 3) { holdTimer = 1.0; }
                 }
 
-                // PINCH: draw beam to target
-                if (gesture === 4) {
-                    const pts = beamLine.geometry.attributes.position;
-                    pts.setXYZ(0, handPos.x, handPos.y, handPos.z);
-                    pts.setXYZ(1, targetPos.x, targetPos.y, targetPos.z);
-                    pts.needsUpdate = true;
-                    beamLine.material.opacity = 0.6;
-                } else {
-                    beamLine.material.opacity = 0;
-                }
-
-                // THUMBS_UP: brighten target
-                if (gesture === 6) {
-                    cells[collected].mesh.material.emissive.setHex(0x8844ff);
-                }
+                // Hints removed — no beam preview, no THUMBS_UP emissive
+                beamLine.material.opacity = 0;
             });
 
             if (touching) {
@@ -516,9 +561,16 @@ function animate() {
             }
 
             if (holdTimer >= 1.0) {
-                // COLLECTED!
+                // COLLECTED! Play same note as preview via /note
                 burstParticles(GRID_POSITIONS[collected]);
-                sendOsc('transformation_note', PENTA[sequence[collected]]);
+                const MIDI = [60, 62, 64, 67, 69, 72, 74, 76];
+                const collectedMidi = MIDI[sequence[collected]];
+                fetch('http://localhost:8080/note', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ midi: collectedMidi, amp: 0.8, decay: 1.0 })
+                }).catch(() => {});
+                sendOsc('transformation_note', collectedMidi); // also update Tidal loop
                 collected++;
                 holdTimer = 0;
                 holdRingMat.opacity = 0;

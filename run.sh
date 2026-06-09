@@ -65,24 +65,19 @@ if [ "$OS" = "Darwin" ]; then
         sleep 2
     fi
 
-    # Only start SC if not already running (don't kill GUI sessions)
+    # SC must run in GUI on Mac — check it's already up
     if lsof -i UDP:57120 >/dev/null 2>&1; then
-        echo "  SuperCollider already running ✓ (keeping existing session)"
+        echo "  SuperCollider running ✓"
     else
-        echo "  Starting SuperCollider + SuperDirt (this takes ~2min on first run)..."
-        "$SCLANG" ~/Documents/tidal/startup.scd > /tmp/sc_run.log 2>&1 &
-        SC_PID=$!
-
-        echo "  Waiting for SuperDirt to load..."
-        for i in $(seq 90); do
-            sleep 2
-            if grep -q "SuperDirt: listening" /tmp/sc_run.log 2>/dev/null; then
-                echo "  SuperDirt ready ✓"
-                break
-            fi
-            printf "."
-        done
         echo ""
+        echo "  ┌──────────────────────────────────────────────────────┐"
+        echo "  │  SuperCollider not running.                          │"
+        echo "  │  1. Open SuperCollider.app                           │"
+        echo "  │  2. Run startup.scd (Cmd+A then Shift+Enter)         │"
+        echo "  │  3. Wait for 'SuperDirt: listening' in post window   │"
+        echo "  │  4. Re-run: ./run.sh                                 │"
+        echo "  └──────────────────────────────────────────────────────┘"
+        exit 1
     fi
 
     # Kill and restart Tidal

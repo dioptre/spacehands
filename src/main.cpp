@@ -85,6 +85,7 @@ int main(int argc, char* argv[]) {
         std::cerr << "Warning: OSC connection failed — SuperCollider may not be running\n";
     }
     osc.connectTidal("127.0.0.1", 6010); // also send /ctrl to Tidal
+    osc.silenceAllOrbits();              // clear stale gains on startup
 
     // ---- Servers ----
     // Assets dir: relative to binary (copied by CMake post-build)
@@ -140,19 +141,36 @@ int main(int argc, char* argv[]) {
 
         // Pool: debounced hand arrivals/departures
         // Require ARRIVE_FRAMES consecutive detections before assigning
-        // Pool: direct assign/release — no debounce
+        // Pool assignment with minimal debounce — prevents YOLO flicker from
+        // cycling through instruments. Cursor updates immediately (uses raw hands).
         {
-            static std::unordered_set<int> confirmed;
+            static constexpr int STABLE_FRAMES = 5; // ~165ms at 30fps
+            static std::unordered_map<int,int> stableCount;
+            static std::unordered_set<int>     confirmed;
 
             std::unordered_set<int> curIds;
             for (const auto& h : hands) curIds.insert(h.id);
 
-            for (int id : curIds)
-                if (!confirmed.count(id)) { confirmed.insert(id); pool.assign(id); }
+            // Increment stability counter, assign when stable
+            for (int id : curIds) {
+                stableCount[id]++;
+                if (stableCount[id] >= STABLE_FRAMES && !confirmed.count(id)) {
+                    confirmed.insert(id);
+                    pool.assign(id);
+                }
+            }
+            // Clean up lost hands immediately
+            for (auto it = stableCount.begin(); it != stableCount.end(); )
+                if (!curIds.count(it->first)) it = stableCount.erase(it); else ++it;
 
+            bool wasEmpty = confirmed.empty();
             for (auto it = confirmed.begin(); it != confirmed.end(); ) {
                 if (!curIds.count(*it)) { pool.release(*it); it = confirmed.erase(it); }
                 else ++it;
+            }
+            // When all hands leave, immediately zero all gains
+            if (!wasEmpty && confirmed.empty()) {
+                osc.silenceAllOrbits();
             }
 
             pool.tick(dt);
@@ -160,6 +178,7 @@ int main(int argc, char* argv[]) {
             // Hush all patterns after 15s with no confirmed hands
             static float silenceTimer = 0.f;
             static bool  hushed = false;
+            bool& hushedRef = hushed; // accessible below for sendPool gate
             if (confirmed.empty()) {
                 silenceTimer += dt;
                 if (silenceTimer >= 15.f && !hushed) {
@@ -167,7 +186,7 @@ int main(int argc, char* argv[]) {
 #ifdef HAVE_LIBLO
                     if (osc.tidalAddr()) {
                         lo_address ta = (lo_address)osc.tidalAddr();
-                        // Zero all orbit gains — keeps patterns alive but silent
+                        // Zero all orbit gains — d1-d12
                         for (int i = 0; i < 12; i++) {
                             std::string key = "o" + std::to_string(i) + "_gain";
                             lo_message m = lo_message_new();
@@ -176,9 +195,15 @@ int main(int argc, char* argv[]) {
                             lo_send_message(ta, "/ctrl", m);
                             lo_message_free(m);
                         }
+                        // Also zero transformation_active — silences d15/d16
+                        lo_message m2 = lo_message_new();
+                        lo_message_add_string(m2, "transformation_active");
+                        lo_message_add_float(m2, 0.0f);
+                        lo_send_message(ta, "/ctrl", m2);
+                        lo_message_free(m2);
                     }
 #endif
-                    std::cout << "[Pool] 15s silence — zeroing gains\n";
+                    std::cout << "[Pool] 15s silence — zeroing all gains\n";
                 }
             } else {
                 silenceTimer = 0.f;
@@ -196,7 +221,7 @@ int main(int argc, char* argv[]) {
         auto music = mapper.map(hands, state);
 
         // OSC: per-hand depth-bucket messages + global params
-        osc.send(hands, music, state);
+        osc.send(hands, music, state, cfg.sc_instruments);
         // OSC: pool assignments → Tidal /ctrl
         osc.sendPool(pool, hands, music);
 

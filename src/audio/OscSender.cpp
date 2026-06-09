@@ -65,6 +65,17 @@ static void sendCtrlStr(lo_address tidal, const char* key, const char* val) {
 #endif
 }
 
+void OscSender::silenceAllOrbits() {
+#ifdef HAVE_LIBLO
+    if (!tidal_) return;
+    for (int i = 0; i < 12; i++) {
+        std::string key = "o" + std::to_string(i) + "_gain";
+        sendCtrl(tidal_, key.c_str(), 0.0f);
+    }
+    std::cout << "[OscSender] zeroed all orbit gains\n";
+#endif
+}
+
 // Build and send a message using the lo_message API (avoids variadic float promotion)
 static void sendMsg(lo_address addr, const char* path,
                     std::initializer_list<std::pair<char, float>> args_f,
@@ -127,24 +138,26 @@ void OscSender::sendSpatial(float x, float y) {
 void OscSender::sendLevel(int level) { sendMsgI(addr_, "/level", level); }
 void OscSender::sendMute(bool muted) { sendMsgI(addr_, "/mute", muted ? 1 : 0); }
 
-void OscSender::send(const HandList& hands, const MusicParams& p, const GameStateData& state) {
+void OscSender::send(const HandList& hands, const MusicParams& p, const GameStateData& state, bool scInstruments) {
     if (!addr_) return;
 
-    // Per-hand: /hand id x y z_mm z_vel gesture_id
+    // Per-hand: /hand id x y z_mm z_vel gesture_id (only if SC instruments enabled)
     std::set<int> active_buckets;
-    for (const auto& h : hands) {
+    if (scInstruments) {
+        for (const auto& h : hands) {
 #ifdef HAVE_LIBLO
-        lo_message m = lo_message_new();
-        lo_message_add_int32(m, h.id);
-        lo_message_add_float(m, h.x);
-        lo_message_add_float(m, h.y);
-        lo_message_add_float(m, h.z_mm);
-        lo_message_add_float(m, h.z_vel);
-        lo_message_add_float(m, (float)(int)h.gesture);
-        lo_send_message(addr_, "/hand", m);
-        lo_message_free(m);
+            lo_message m = lo_message_new();
+            lo_message_add_int32(m, h.id);
+            lo_message_add_float(m, h.x);
+            lo_message_add_float(m, h.y);
+            lo_message_add_float(m, h.z_mm);
+            lo_message_add_float(m, h.z_vel);
+            lo_message_add_float(m, (float)(int)h.gesture);
+            lo_send_message(addr_, "/hand", m);
+            lo_message_free(m);
 #endif
-        active_buckets.insert(h.bucket);
+            active_buckets.insert(h.bucket);
+        }
     }
 
     // /hands_end + list of active bucket indices
@@ -261,11 +274,23 @@ void OscSender::sendPool(const InstrumentPool& pool, const HandList& hands, cons
         auto it = handMap.find(a.handId);
         if (it != handMap.end()) {
             const Hand* h = it->second;
+            // Pentatonic note index from Y (top=high, bottom=low)
+            static const int PENTA[] = {0, 2, 4, 7, 9, 12, 14, 16};
+            int noteIdx = (int)((1.f - h->y) * 7.f + 0.5f);
+            noteIdx = std::clamp(noteIdx, 0, 7);
+            // Z maps to octave: close (z≈0.3) = 0 octave, far (z≈0.8) = +1 octave
+            // Split into 3 zones: close=base, mid=+octave, far=+2octaves
+            int octaveShift = 0;
+            if (h->z > 0.6f) octaveShift = 2;
+            else if (h->z > 0.4f) octaveShift = 1;
+            int finalNote = PENTA[noteIdx] + (octaveShift * 12);
+
             sendCtrl(tidal_, (prefix + "x").c_str(),      h->x);
             sendCtrl(tidal_, (prefix + "y").c_str(),      h->y);
             sendCtrl(tidal_, (prefix + "z").c_str(),      h->z);
             sendCtrl(tidal_, (prefix + "g").c_str(),      (float)(int)h->gesture);
-            sendCtrl(tidal_, (prefix + "gain").c_str(),   a.fadeOut * (1.f - h->z * 0.3f));
+            sendCtrl(tidal_, (prefix + "note").c_str(),   (float)finalNote);
+            sendCtrl(tidal_, (prefix + "gain").c_str(),   a.fadeOut * 0.8f);
             sendCtrl(tidal_, (prefix + "active").c_str(), 1.f);
             sendCtrl(tidal_, (prefix + "hue").c_str(),    a.inst.hue);
         } else {

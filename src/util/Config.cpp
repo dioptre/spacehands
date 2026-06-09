@@ -24,7 +24,8 @@ Config Config::load(const std::string& path) {
         if (j.contains("yolo_model"))   cfg.yolo_model  = j["yolo_model"];
         if (j.contains("yolo_conf"))    cfg.yolo_conf   = j["yolo_conf"];
         if (j.contains("yolo_iou"))     cfg.yolo_iou    = j["yolo_iou"];
-        if (j.contains("mirror_x"))     cfg.mirror_x    = j["mirror_x"];
+        if (j.contains("mirror_x"))      cfg.mirror_x       = j["mirror_x"];
+        if (j.contains("sc_instruments")) cfg.sc_instruments = j["sc_instruments"];
         if (j.contains("coord_x_min"))  cfg.coord_x_min = j["coord_x_min"];
         if (j.contains("coord_x_max"))  cfg.coord_x_max = j["coord_x_max"];
         if (j.contains("coord_y_min"))  cfg.coord_y_min = j["coord_y_min"];

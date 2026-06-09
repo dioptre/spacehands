@@ -14,6 +14,7 @@ struct Config {
     float yolo_conf         = 0.45f;
     float yolo_iou          = 0.5f;
     bool  mirror_x          = false;
+    bool  sc_instruments    = true;  // send /hand to SC SynthDefs
     float coord_x_min       = 0.05f;
     float coord_x_max       = 0.93f;
     float coord_y_min       = 0.15f;
