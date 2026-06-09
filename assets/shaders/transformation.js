@@ -254,21 +254,43 @@ loader.load('models/alien.glb', (gltf) => {
     }
 }, undefined, () => { console.log('[transformation] alien.glb not found'); });
 
-// ---- Hand cursors ----
+// ---- Hand cursors — use hand.glb model ----
 const handMeshes = [];
-const handColors = [0x00ffaa, 0xff6600, 0xffff00, 0xff00ff];
-for (let i = 0; i < 4; i++) {
-    const m = new THREE.Mesh(
-        new THREE.SphereGeometry(0.12, 16, 16),
-        new THREE.MeshStandardMaterial({
-            color: handColors[i], emissive: handColors[i],
-            emissiveIntensity: 0.8, transparent: true, opacity: 0.85
-        })
-    );
-    m.visible = false;
-    scene.add(m);
-    handMeshes.push(m);
-}
+const handColors = [0xf0f4ff, 0xffe0aa, 0xaaffdd, 0xffaaff];
+const handLoader = new GLTFLoader();
+handLoader.load('models/hand.glb', (gltf) => {
+    for (let i = 0; i < 4; i++) {
+        const h = gltf.scene.clone(true);
+        const box = new THREE.Box3().setFromObject(h);
+        const size = box.getSize(new THREE.Vector3());
+        const ns = 0.56 / Math.max(size.x, size.y, size.z); // 2x bigger
+        h.scale.setScalar(ns);
+        h.traverse(child => {
+            if (child.isMesh) {
+                child.material = new THREE.MeshStandardMaterial({
+                    color: handColors[i],
+                    emissive: new THREE.Color(handColors[i]).multiplyScalar(0.3),
+                    roughness: 0.3, metalness: 0.1,
+                    transparent: true, opacity: 0.9
+                });
+            }
+        });
+        h.visible = false;
+        scene.add(h);
+        handMeshes.push(h);
+    }
+}, undefined, () => {
+    // Fallback to spheres if model not found
+    for (let i = 0; i < 4; i++) {
+        const m = new THREE.Mesh(
+            new THREE.SphereGeometry(0.12, 16, 16),
+            new THREE.MeshStandardMaterial({ color: handColors[i], emissive: handColors[i], emissiveIntensity: 0.8, transparent: true, opacity: 0.85 })
+        );
+        m.visible = false;
+        scene.add(m);
+        handMeshes.push(m);
+    }
+});
 
 // ---- Hold ring (shows progress) ----
 const holdRingGeo = new THREE.TorusGeometry(0.55, 0.04, 8, 48);
@@ -572,6 +594,28 @@ function animate() {
         }
     });
 
+    // ---- Hand cursors — always update regardless of state ----
+    hands.slice(0, 4).forEach((h, i) => {
+        if (i >= handMeshes.length) return;
+        const wp = handWorldPos(
+            window.mirrorX ? 1-(h.x||0.5) : (h.x||0.5),
+            h.y||0.5, h.z||0.5
+        );
+        const prev = handMeshes[i].position.clone();
+        handMeshes[i].visible = true;
+        handMeshes[i].position.lerp(wp, 0.3);
+        const vel = handMeshes[i].position.clone().sub(prev);
+        // Base tilt from position (outward lean) + velocity tilt
+        const posX = handMeshes[i].position.x;
+        const posY = handMeshes[i].position.y;
+        handMeshes[i].rotation.z = -posX * 0.3 - vel.x * 6;
+        handMeshes[i].rotation.x =  posY * 0.2 + vel.y * 4;
+        handMeshes[i].rotation.y =  posX * 0.2; // slight Y rotation toward viewer
+    });
+    for (let i = numHands; i < 4; i++) {
+        if (i < handMeshes.length) handMeshes[i].visible = false;
+    }
+
     // ---- State machine ----
     // Reshuffle sequence periodically (resets collected progress)
     sequenceAge += dt;
@@ -661,16 +705,6 @@ sequence = shuffle([0,1,2,3,4,5,6,7,8,9,10,11]).slice(0, NUM_NOTES);
             idleTimer = 0;
         }
 
-        // Hand cursors
-        hands.slice(0, 4).forEach((h, i) => {
-            const wp = handWorldPos(
-                window.mirrorX ? 1-(h.x||0.5) : (h.x||0.5),
-                h.y||0.5, h.z||0.5
-            );
-            handMeshes[i].visible = true;
-            handMeshes[i].position.lerp(wp, 0.25);
-        });
-        for (let i = numHands; i < 4; i++) handMeshes[i].visible = false;
 
         // Touch detection
         if (collected < 8) {
