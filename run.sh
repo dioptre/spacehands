@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # All-in-one: install deps → download model → build → launch
-# Starts: SuperCollider + SuperDirt, Tidal (hand-reactive patterns), C++ binary, browser
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 OS="$(uname -s)"
@@ -17,8 +16,8 @@ if [ "$OS" = "Darwin" ]; then
     brew list opencv &>/dev/null || NEED_DEPS=1
     brew list liblo  &>/dev/null || NEED_DEPS=1
 else
-    pkg-config --exists liblo    2>/dev/null || NEED_DEPS=1
-    pkg-config --exists opencv4  2>/dev/null || NEED_DEPS=1
+    pkg-config --exists liblo   2>/dev/null || NEED_DEPS=1
+    pkg-config --exists opencv4 2>/dev/null || NEED_DEPS=1
 fi
 if [ "$NEED_DEPS" = "1" ]; then
     echo "  Missing deps — running deps.sh..."
@@ -51,24 +50,34 @@ echo "[4/4] Launching..."
 
 CONFIG="$ROOT/config.json"
 SHADER="${SHADER:-wormhole}"
-RESET_TIDAL="${RESET_TIDAL:-0}"  # RESET_TIDAL=1 ./run.sh to kill+restart Tidal
 SC_PID=""
 CHROM_PID=""
+BIN_PID=""
 
 if [ "$OS" = "Darwin" ]; then
     SCLANG="/Applications/SuperCollider.app/Contents/MacOS/sclang"
 
-    # --- SuperCollider + SuperDirt ---
+    # RESET_SC=1 ./run.sh to kill existing SC and start fresh
+    if [ "${RESET_SC:-0}" = "1" ]; then
+        echo "  Killing SuperCollider for clean restart..."
+        pkill -9 -f "sclang"  2>/dev/null || true
+        pkill -9 -f "scsynth" 2>/dev/null || true
+        sleep 2
+    fi
+
+    # Only start SC if not already running (don't kill GUI sessions)
     if lsof -i UDP:57120 >/dev/null 2>&1; then
-        echo "  SuperCollider already running ✓"
+        echo "  SuperCollider already running ✓ (keeping existing session)"
     else
-        echo "  Starting SuperCollider + SuperDirt (this takes ~30s)..."
-        "$SCLANG" ~/Documents/tidal/startup.scd &
+        echo "  Starting SuperCollider + SuperDirt (this takes ~2min on first run)..."
+        "$SCLANG" ~/Documents/tidal/startup.scd > /tmp/sc_run.log 2>&1 &
         SC_PID=$!
-        for i in $(seq 45); do
+
+        echo "  Waiting for SuperDirt to load..."
+        for i in $(seq 90); do
             sleep 2
-            if lsof -i UDP:57120 >/dev/null 2>&1; then
-                echo "  SuperCollider ready ✓"
+            if grep -q "SuperDirt: listening" /tmp/sc_run.log 2>/dev/null; then
+                echo "  SuperDirt ready ✓"
                 break
             fi
             printf "."
@@ -76,7 +85,7 @@ if [ "$OS" = "Darwin" ]; then
         echo ""
     fi
 
-    # --- Tidal --- kill all instances, start fresh with instrument patterns
+    # Kill and restart Tidal
     echo "  Killing any running Tidal instances..."
     pkill -f "ghci" 2>/dev/null || true
     sleep 2
@@ -88,10 +97,10 @@ if [ "$OS" = "Darwin" ]; then
     end tell"
     echo "  Tidal starting (ready in ~15s)..."
     sleep 15
-    fi
 
-    # --- C++ binary ---
+    # Start C++ binary
     echo "  Starting instrument binary..."
+    sleep 2
     cd "$ROOT"
     "$BUILD/instrument" --config "$CONFIG" &
     BIN_PID=$!
@@ -109,7 +118,6 @@ else
         "$SCLANG" ~/Documents/tidal/startup.scd > /tmp/sc_instrument.log 2>&1 &
         SC_PID=$!
         sleep 10
-        # Start Tidal headless with nohup
         nohup ghci -ghci-script ~/Documents/tidal/boot-instrument.ghci \
             > /tmp/tidal_instrument.log 2>&1 &
         sleep 6
@@ -131,17 +139,14 @@ fi
 echo ""
 echo "======================================"
 echo "  http://localhost:8080/?shader=${SHADER}"
-echo "  Shaders: wormhole | voronoi | frequency | hand | offering"
+echo "  Shaders: wormhole | voronoi | frequency | hand | offering | transformation"
 echo ""
-echo "  Tidal terminal: type patterns live, e.g."
-echo "    d1 \$ s \"arpy\" # n (cF 0 \"hand0_y\" * 8)"
-echo ""
-echo "  Press Ctrl+C to stop binary (SC/Tidal stay running)"
+echo "  Press Ctrl+C to stop"
 echo "======================================"
 
 cleanup() {
-    echo "Shutting down binary..."
-    kill $BIN_PID ${CHROM_PID:-} 2>/dev/null
+    echo "Shutting down..."
+    kill $BIN_PID ${SC_PID:-} ${CHROM_PID:-} 2>/dev/null
     wait 2>/dev/null
     exit 0
 }

@@ -50,7 +50,7 @@ scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0x8855ff, 
 
 // ---- Pentatonic notes (MIDI) ----
 const PENTA = [60, 62, 64, 67, 69, 72, 74, 76]; // C4 D4 E4 G4 A4 C5 D5 E5
-const NOTE_NAMES = ['C4','D4','E4','G4','A4','C5','D5','E5'];
+const NOTE_NAMES = ['c4','d4','e4','g4','a4','c5','d5','e5'];
 
 // ---- Grid: 2x2x2 = 8 cells ----
 // Cells placed at 25% and 75% of screen in each axis

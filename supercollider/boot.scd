@@ -1,6 +1,10 @@
 // Instrument integration — load into running SuperDirt instance.
 // Run: load("/Users/andrewgrosser/Documents/ag/instrument/supercollider/boot.scd");
 
+// Guard: only run once per SC session
+if (~instrumentBooted != true) {
+~instrumentBooted = true;
+
 Routine({
     var instrumentRoot = thisProcess.nowExecutingPath.dirname;
 
@@ -45,3 +49,4 @@ Routine({
     "=== Instrument ready ===".postln;
 
 }).play;
+}; // end guard
