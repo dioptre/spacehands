@@ -19,6 +19,7 @@ bool HandDetector::load() {
     }
     net_.setPreferableBackend(cv::dnn::DNN_BACKEND_OPENCV);
     net_.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
+    cv::setNumThreads(4); // use all available cores for inference
     loaded_ = true;
     std::cout << "[HandDetector] hand model loaded: " << model_path_ << "\n";
     return true;

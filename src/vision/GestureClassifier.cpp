@@ -101,7 +101,7 @@ HandList GestureClassifier::classify(const std::vector<Detection>& detections,
     assignIds(hands);
 
     // Smooth position and Z velocity from previous frame
-    static constexpr float SMOOTH = 0.35f; // lerp speed — lower = smoother
+    static constexpr float SMOOTH = 0.7f; // fast tracking, minimal lag
     for (auto& h : hands) {
         auto it = std::find_if(prev_.begin(), prev_.end(),
                                [&](const Hand& p){ return p.id == h.id; });
