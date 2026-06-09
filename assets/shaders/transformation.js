@@ -151,6 +151,8 @@ sequence = shuffle([0,1,2,3,4,5,6,7,8,9,10,11]).slice(0, NUM_NOTES);
     previewStep = 0;
     previewTimer = 0;
     sequenceAge = 0;
+    // Restore boxes
+    cells.forEach(c => { c.mesh.visible = true; c.wf.visible = true; });
     updateCellVisuals();
     updateMelody();
     state = States.IDLE;
@@ -788,6 +790,8 @@ sequence = shuffle([0,1,2,3,4,5,6,7,8,9,10,11]).slice(0, NUM_NOTES);
                     state = States.CLIMAX;
                     climaxTimer = 0;
                     sendOsc('transformation_climax', 1);
+                    // Hide boxes, keep aliens
+                    cells.forEach(c => { c.mesh.visible = false; c.wf.visible = false; });
                 }
             }
         }
@@ -862,6 +866,7 @@ window.triggerEnding = () => {
     state = States.CLIMAX;
     climaxTimer = 0;
     sendOsc('transformation_climax', 1);
+    cells.forEach(c => { c.mesh.visible = false; c.wf.visible = false; });
     console.log('[transformation] ending triggered manually');
 };
 `;
