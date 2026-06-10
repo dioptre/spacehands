@@ -34,5 +34,13 @@ struct Config {
     int http_port           = 8080;
     int mjpeg_port          = 8082;
 
+    // visualizer
+    bool enable_visualizer  = false;
+    int  visualizer_width   = 1280;
+    int  visualizer_height  = 720;
+    bool fullscreen         = false;
+    int  crop_left          = 0;
+    int  crop_right         = 0;
+
     static Config load(const std::string& path);
 };

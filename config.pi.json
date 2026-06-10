@@ -11,5 +11,9 @@
   "osc_port":       57120,
   "ws_port":        8081,
   "http_port":      8080,
-  "mjpeg_port":     8082
+  "mjpeg_port":     8082,
+  "enable_visualizer": true,
+  "visualizer_width":  960,
+  "visualizer_height": 540,
+  "fullscreen":        true
 }

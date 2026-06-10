@@ -41,6 +41,12 @@ Config Config::load(const std::string& path) {
         if (j.contains("ws_port"))      cfg.ws_port     = j["ws_port"];
         if (j.contains("http_port"))    cfg.http_port   = j["http_port"];
         if (j.contains("mjpeg_port"))   cfg.mjpeg_port  = j["mjpeg_port"];
+        if (j.contains("enable_visualizer")) cfg.enable_visualizer = j["enable_visualizer"];
+        if (j.contains("visualizer_width"))  cfg.visualizer_width  = j["visualizer_width"];
+        if (j.contains("visualizer_height")) cfg.visualizer_height = j["visualizer_height"];
+        if (j.contains("fullscreen"))        cfg.fullscreen        = j["fullscreen"];
+        if (j.contains("crop_left"))         cfg.crop_left         = j["crop_left"];
+        if (j.contains("crop_right"))        cfg.crop_right        = j["crop_right"];
     } catch (const std::exception& e) {
         std::cerr << "[Config] parse error: " << e.what() << "\n";
     }

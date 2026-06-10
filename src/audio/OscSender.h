@@ -24,6 +24,11 @@ public:
     // Global:   /tempo /fx /level /mute on change
     void send(const HandList& hands, const MusicParams& p, const GameStateData& state, bool scInstruments = true);
 
+    // Custom helper methods for visualizer/game triggering
+    void sendTidalCtrl(const char* key, float val);
+    void sendTidalCtrlStr(const char* key, const char* val);
+    void sendDirtPlay(int midi, float amp, float decay);
+
 private:
     std::string host_;
     int         port_;

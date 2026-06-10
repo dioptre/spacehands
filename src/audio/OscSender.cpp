@@ -299,3 +299,29 @@ void OscSender::sendPool(const InstrumentPool& pool, const HandList& hands, cons
         }
     }
 }
+
+void OscSender::sendTidalCtrl(const char* key, float val) {
+    ::sendCtrl(tidal_, key, val);
+}
+
+void OscSender::sendTidalCtrlStr(const char* key, const char* val) {
+    ::sendCtrlStr(tidal_, key, val);
+}
+
+void OscSender::sendDirtPlay(int midi, float amp, float decay) {
+#ifdef HAVE_LIBLO
+    if (!addr_) return;
+    lo_message m = lo_message_new();
+    lo_message_add_string(m, "cps");      lo_message_add_float(m, 0.5f);
+    lo_message_add_string(m, "cycle");    lo_message_add_float(m, 0.f);
+    lo_message_add_string(m, "delta");    lo_message_add_float(m, 0.5f);
+    lo_message_add_string(m, "orbit");    lo_message_add_int32(m, 0);
+    lo_message_add_string(m, "s");        lo_message_add_string(m, "superpiano");
+    lo_message_add_string(m, "note");     lo_message_add_float(m, (float)(midi - 60));
+    lo_message_add_string(m, "gain");     lo_message_add_float(m, amp);
+    lo_message_add_string(m, "sustain");  lo_message_add_float(m, decay);
+    lo_message_add_string(m, "room");     lo_message_add_float(m, 0.4f);
+    lo_send_message(addr_, "/dirt/play", m);
+    lo_message_free(m);
+#endif
+}

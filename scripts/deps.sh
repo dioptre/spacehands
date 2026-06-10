@@ -11,6 +11,7 @@ if [ "$OS" = "Darwin" ]; then
     brew install cmake pkg-config
     brew install opencv   # includes DNN module — used for ONNX hand detection
     brew install liblo
+    brew install glfw glew glm
 
     # SuperCollider — install .app via cask if sclang not already present
     if [ ! -x "/Applications/SuperCollider.app/Contents/MacOS/sclang" ] && ! command -v sclang &>/dev/null; then
@@ -46,7 +47,10 @@ elif [ "$OS" = "Linux" ]; then
         libreadline-dev \
         libxkbcommon-dev \
         jackd2 \
-        pipewire-jack
+        pipewire-jack \
+        libglfw3-dev \
+        libglew-dev \
+        libglm-dev
 
     # Check if SuperCollider is installed, otherwise build headless from source
     if command -v sclang &>/dev/null; then

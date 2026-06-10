@@ -105,8 +105,15 @@ if [ "$OS" = "Darwin" ]; then
     BIN_PID=$!
     sleep 3
 
-    echo "  Opening browser..."
-    open "http://localhost:8080/?shader=${SHADER}"
+    ENABLE_VISUALIZER=0
+    if grep -q '"enable_visualizer"[[:space:]]*:[[:space:]]*true' "$CONFIG"; then
+        ENABLE_VISUALIZER=1
+    fi
+
+    if [ "$ENABLE_VISUALIZER" = "0" ]; then
+        echo "  Opening browser..."
+        open "http://localhost:8080/?shader=${SHADER}"
+    fi
 
 else
     # Linux/Pi
@@ -148,18 +155,27 @@ else
     BIN_PID=$!
     sleep 2
 
+    ENABLE_VISUALIZER=0
+    if grep -q '"enable_visualizer"[[:space:]]*:[[:space:]]*true' "$CONFIG"; then
+        ENABLE_VISUALIZER=1
+    fi
+
     export DISPLAY=:0
-    BROWSER=$(command -v chromium-browser || command -v chromium || echo "")
-    if [ -n "$BROWSER" ]; then
-        "$BROWSER" --kiosk --no-sandbox \
-            --disable-infobars --noerrdialogs \
-            --ignore-gpu-blocklist \
-            --enable-gpu-rasterization \
-            --enable-zero-copy \
-            --app="http://127.0.0.1:8080/?shader=${SHADER}" &
-        CHROM_PID=$!
+    if [ "$ENABLE_VISUALIZER" = "0" ]; then
+        BROWSER=$(command -v chromium-browser || command -v chromium || echo "")
+        if [ -n "$BROWSER" ]; then
+            "$BROWSER" --kiosk --no-sandbox \
+                --disable-infobars --noerrdialogs \
+                --ignore-gpu-blocklist \
+                --enable-gpu-rasterization \
+                --enable-zero-copy \
+                --app="http://127.0.0.1:8080/?shader=${SHADER}" &
+            CHROM_PID=$!
+        else
+            echo "WARNING: Chromium not found! Open a browser and visit: http://localhost:8080/?shader=${SHADER}"
+        fi
     else
-        echo "WARNING: Chromium not found! Open a browser and visit: http://localhost:8080/?shader=${SHADER}"
+        echo "  Native visualizer enabled — skipping Chromium launch."
     fi
 fi
 

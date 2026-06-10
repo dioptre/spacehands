@@ -34,12 +34,17 @@ if(NOT APPLE)
     find_package(ArducamDepthCamera REQUIRED)
 endif()
 
-# uSockets stub — uWebSockets headers are vendored but uSockets source
-# is not needed since we use cpp-httplib for all HTTP/SSE serving.
+# uSockets stub — required for compilation
 add_library(uSockets INTERFACE)
 target_include_directories(uSockets INTERFACE
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/uSockets"
 )
+
+# GLFW3, GLEW & OpenGL
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(GLFW REQUIRED glfw3)
+find_package(GLEW REQUIRED)
+find_package(OpenGL REQUIRED)
 
 # ---------- Sources -------------------------------------------------------------
 set(SOURCES
@@ -56,6 +61,7 @@ set(SOURCES
     src/server/WsServer.cpp
     src/server/MjpegStreamer.cpp
     src/util/Config.cpp
+    src/renderer/Renderer.cpp
 )
 
 if(NOT APPLE)
@@ -70,12 +76,18 @@ target_include_directories(instrument PRIVATE
     third_party/uWebSockets/src
     third_party/uSockets/src
     ${OpenCV_INCLUDE_DIRS}
+    ${GLFW_INCLUDE_DIRS}
+    ${GLEW_INCLUDE_DIRS}
+    ${OPENGL_INCLUDE_DIR}
 )
 
 target_link_libraries(instrument PRIVATE
     ${OpenCV_LIBS}
     Threads::Threads
     uSockets
+    ${GLFW_LIBRARIES}
+    ${GLEW_LIBRARIES}
+    ${OPENGL_LIBRARIES}
 )
 if(LibLo_FOUND)
     target_link_libraries(instrument PRIVATE ${LibLo_LIBRARIES})
@@ -85,6 +97,7 @@ endif()
 if(NOT APPLE)
     target_link_libraries(instrument PRIVATE ArducamDepthCamera::ArducamDepthCamera)
 endif()
+
 
 
 # ---------- Assets copy ---------------------------------------------------------
