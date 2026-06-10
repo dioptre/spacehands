@@ -127,8 +127,7 @@ else
         fi
 
         # Check and install missing SuperCollider Quarks (SuperDirt, TidalLooper)
-        echo "  Checking SuperCollider Quarks..."
-        if ! echo 'if(\SuperDirt.asClass.notNil && { \TidalLooper.asClass.notNil }) { 0.exit } { 1.exit };' | "$SCLANG" >/dev/null 2>&1; then
+        if [ ! -d "$HOME/.local/share/SuperCollider/downloaded-quarks/SuperDirt" ]; then
             echo "  Installing missing Quarks (SuperDirt, TidalLooper)..."
             echo 'Quarks.install("SuperDirt"); Quarks.install("'"$HOME"'/Documents/tidal/quarks/tidal-looper"); 0.exit;' | "$SCLANG" >/dev/null 2>&1
         fi

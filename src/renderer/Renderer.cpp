@@ -560,6 +560,7 @@ bool Renderer::init(int width, int height, bool fullscreen, OscSender& osc, cons
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
 #endif
+    glfwWindowHint(GLFW_SAMPLES, 4); // Enable 4x MSAA
 
     GLFWmonitor* monitor = nullptr;
     if (fullscreen_) {
@@ -615,6 +616,11 @@ bool Renderer::init(int width, int height, bool fullscreen, OscSender& osc, cons
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_PROGRAM_POINT_SIZE);
+
+    glEnable(GL_MULTISAMPLE);
+    glEnable(GL_LINE_SMOOTH);
+    glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
+    glLineWidth(2.5f);
 
     initShaders();
     initMeshes();

@@ -50,7 +50,8 @@ elif [ "$OS" = "Linux" ]; then
         pipewire-jack \
         libglfw3-dev \
         libglew-dev \
-        libglm-dev
+        libglm-dev \
+        sc3-plugins
 
     # Check if SuperCollider is installed, otherwise build headless from source
     if command -v sclang &>/dev/null; then
