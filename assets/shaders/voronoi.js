@@ -22,7 +22,7 @@
     uniform float u_progress;
     uniform sampler2D u_cam;
 
-    #define NUM_POINTS 512
+    #define NUM_POINTS 128
     #define SEED 3
 
     void main() {
@@ -94,7 +94,8 @@
 
     let W=0, H=0;
     function resize() {
-        W = canvas.clientWidth; H = canvas.clientHeight;
+        const scale = window.webglRenderScale || 1.0;
+        W = canvas.clientWidth * scale; H = canvas.clientHeight * scale;
         canvas.width = W; canvas.height = H;
     }
     window.addEventListener('resize', resize); resize();

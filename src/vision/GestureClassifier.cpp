@@ -25,7 +25,7 @@ Gesture GestureClassifier::inferGesture(const cv::Mat& confidence_frame,
     if (roi.area() < 4) return Gesture::UNKNOWN;
 
     cv::Mat region;
-    confidence_frame(roi).convertTo(region, CV_8U, 255.f / 1024.f);
+    cv::normalize(confidence_frame(roi), region, 0, 255, cv::NORM_MINMAX, CV_8U);
     cv::threshold(region, region, 60, 255, cv::THRESH_BINARY);
 
     // Aspect ratio: tall+narrow → POINT, wide+short → SPREAD, near-square → FIST/OPEN

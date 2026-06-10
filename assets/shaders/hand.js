@@ -24,7 +24,7 @@ const canvas = document.getElementById('c');
 
 // Three.js scene
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(1.0);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.2;
 
@@ -112,7 +112,8 @@ loader.load('models/hand.glb', (gltf) => {
 });
 
 function resize() {
-    const w = canvas.clientWidth, h = canvas.clientHeight;
+    const scale = window.webglRenderScale || 1.0;
+    const w = canvas.clientWidth * scale, h = canvas.clientHeight * scale;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();

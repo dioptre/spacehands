@@ -28,7 +28,9 @@ private:
     cv::dnn::Net    net_;
 
     // YOLOv8n hand model: 320x320 input, output [1,5,2100] = [cx,cy,w,h,conf]
-    static constexpr int INPUT_SIZE = 320;
+    int             input_w_ = 320;
+    int             input_h_ = 320;
+    bool            is_yolox_ = false;
 
     cv::Mat preprocess(const cv::Mat& src, float& scale, int& pad_x, int& pad_y);
 };

@@ -97,7 +97,10 @@
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,-1,1,1,-1,1]), gl.STATIC_DRAW);
 
     let W=0,H=0;
-    function resize(){W=canvas.clientWidth;H=canvas.clientHeight;canvas.width=W;canvas.height=H;}
+    function resize(){
+        const scale = window.webglRenderScale || 1.0;
+        W=canvas.clientWidth*scale;H=canvas.clientHeight*scale;canvas.width=W;canvas.height=H;
+    }
     window.addEventListener('resize',resize); resize();
 
     function u(n){return gl.getUniformLocation(prog,n);}

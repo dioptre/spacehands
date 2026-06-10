@@ -8,8 +8,9 @@ window.instrumentState = {
 window.camBitmap = null;
 
 (function () {
-    const SSE_URL  = 'http://localhost:8081/state';
-    const MJPEG_URL = 'http://localhost:8082/stream.mjpeg';
+    const host = window.apiHost || 'localhost';
+    const SSE_URL  = `http://${host}:8081/state`;
+    const MJPEG_URL = `http://${host}:8082/stream.mjpeg`;
 
     // --- Feature toggles (default off) ---
     window.showLabels = false;
@@ -44,7 +45,7 @@ window.camBitmap = null;
 
     // --- True SSE push stream at 30Hz from C++ ---
     function connectSSE() {
-        const es = new EventSource('http://localhost:8081/state');
+        const es = new EventSource(SSE_URL);
         es.onmessage = (e) => {
             try {
                 const d = JSON.parse(e.data);

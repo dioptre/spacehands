@@ -23,7 +23,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(1.0);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 
@@ -162,7 +162,8 @@ sequence = shuffle([0,1,2,3,4,5,6,7,8,9,10,11]).slice(0, NUM_NOTES);
 
 // ---- OSC: send to Tidal via C++ HTTP endpoint ----
 function sendOsc(key, val) {
-    fetch('http://localhost:8080/orb', {
+    const host = window.apiHost || 'localhost';
+    fetch('http://' + host + ':8080/orb', {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ ctrl: key, value: val })
@@ -547,7 +548,8 @@ function burstParticles(pos) {
 
 // ---- Resize ----
 function resize() {
-    const w = canvas.clientWidth, h = canvas.clientHeight;
+    const scale = window.webglRenderScale || 1.0;
+    const w = canvas.clientWidth * scale, h = canvas.clientHeight * scale;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
@@ -684,7 +686,8 @@ sequence = shuffle([0,1,2,3,4,5,6,7,8,9,10,11]).slice(0, NUM_NOTES);
             // Play this cell's note as a clean one-shot directly in SC
             const noteIdx = sequence[previewStep];
             const MIDI = [60, 62, 64, 67, 69, 72, 74, 76]; // C4 D4 E4 G4 A4 C5 D5 E5
-            fetch('http://localhost:8080/note', {
+            const host = window.apiHost || 'localhost';
+            fetch('http://' + host + ':8080/note', {
                 method: 'POST',
                 headers: {'Content-Type':'application/json'},
                 body: JSON.stringify({ midi: MIDI[noteIdx], amp: 0.75, decay: 0.4 })
@@ -774,7 +777,8 @@ sequence = shuffle([0,1,2,3,4,5,6,7,8,9,10,11]).slice(0, NUM_NOTES);
                 burstParticles(GRID_POSITIONS[sequence[collected]]);
                 const MIDI = [60, 62, 64, 67, 69, 72, 74, 76];
                 const collectedMidi = PENTA[sequence[collected]];
-                fetch('http://localhost:8080/note', {
+                const host = window.apiHost || 'localhost';
+                fetch('http://' + host + ':8080/note', {
                     method: 'POST',
                     headers: {'Content-Type':'application/json'},
                     body: JSON.stringify({ midi: collectedMidi, amp: 0.8, decay: 0.4 })
