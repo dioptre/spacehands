@@ -188,6 +188,7 @@ void Renderer::close() {
         if (mainShader_) glDeleteProgram(mainShader_);
         if (starfieldShader_) glDeleteProgram(starfieldShader_);
         if (freqShader_) glDeleteProgram(freqShader_);
+        if (flatShader_) glDeleteProgram(flatShader_);
 
         glfwDestroyWindow(window_);
         window_ = nullptr;
@@ -376,6 +377,29 @@ void Renderer::initShaders() {
     freqShader_ = linkProgram(vFreq, fFreq);
     glDeleteShader(vFreq);
     glDeleteShader(fFreq);
+
+    const std::string flatVertShader = R"(
+        #version 130
+        in vec2 aPos;
+        void main() {
+            gl_Position = vec4(aPos, 0.0, 1.0);
+        }
+    )";
+
+    const std::string flatFragShader = R"(
+        #version 130
+        out vec4 fragColor;
+        uniform float u_opacity;
+        void main() {
+            fragColor = vec4(0.0, 0.0, 0.0, u_opacity);
+        }
+    )";
+
+    GLuint vFlat = compileShader(flatVertShader, GL_VERTEX_SHADER);
+    GLuint fFlat = compileShader(flatFragShader, GL_FRAGMENT_SHADER);
+    flatShader_ = linkProgram(vFlat, fFlat);
+    glDeleteShader(vFlat);
+    glDeleteShader(fFlat);
 }
 
 void Renderer::initMeshes() {
@@ -767,6 +791,25 @@ void Renderer::render(const HandList& hands, float dt) {
         sequenceAge_ = 0.0f;
     }
 
+    // Update fade timer and handle phase transition
+    float fadeOpacity = 0.0f;
+    if (fadeState_ == FadeState::FADE_OUT) {
+        fadeTimer_ += dt;
+        fadeOpacity = std::min(fadeTimer_ / 0.5f, 1.0f);
+        if (fadeTimer_ >= 0.5f) {
+            resetGame(); // resets state_ to IDLE
+            fadeState_ = FadeState::FADE_IN;
+            fadeTimer_ = 0.0f;
+        }
+    } else if (fadeState_ == FadeState::FADE_IN) {
+        fadeTimer_ += dt;
+        fadeOpacity = 1.0f - std::min(fadeTimer_ / 0.5f, 1.0f);
+        if (fadeTimer_ >= 0.5f) {
+            fadeState_ = FadeState::NONE;
+            fadeTimer_ = 0.0f;
+        }
+    }
+
     // State Machine
     if (state_ == VisualizerState::IDLE) {
         if (!hands.empty()) {
@@ -881,9 +924,12 @@ void Renderer::render(const HandList& hands, float dt) {
         }
     } 
     else if (state_ == VisualizerState::CONGRATULATIONS) {
-        congratsTimer_ += dt;
-        if (congratsTimer_ > 15.0f) {
-            resetGame();
+        if (fadeState_ != FadeState::FADE_OUT) {
+            congratsTimer_ += dt;
+            if (congratsTimer_ > 15.0f) {
+                fadeState_ = FadeState::FADE_OUT;
+                fadeTimer_ = 0.0f;
+            }
         }
     }
 
@@ -1061,6 +1107,16 @@ void Renderer::render(const HandList& hands, float dt) {
         float offsetX = ((float)cfg_->crop_left + ((float)width_ - (float)cfg_->crop_left - (float)cfg_->crop_right) * 0.5f) - (float)width_ * 0.5f;
         glUniform2f(glGetUniformLocation(freqShader_, "u_offset"), offsetX, 0.0f);
 
+        glBindVertexArray(quadVAO_);
+        glDisable(GL_DEPTH_TEST);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glEnable(GL_DEPTH_TEST);
+    }
+
+    // Draw fade overlay if active
+    if (fadeState_ != FadeState::NONE) {
+        glUseProgram(flatShader_);
+        glUniform1f(glGetUniformLocation(flatShader_, "u_opacity"), fadeOpacity);
         glBindVertexArray(quadVAO_);
         glDisable(GL_DEPTH_TEST);
         glDrawArrays(GL_TRIANGLES, 0, 6);

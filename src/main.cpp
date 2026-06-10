@@ -146,8 +146,8 @@ int main(int argc, char* argv[]) {
             // Vision — use colour frame for detection if available (Mac webcam)
             cv::Mat confidence_input = f->cam.confidence;
             if (f->cam.color.empty() && !f->cam.depth.empty()) {
-                // Mask out background: only keep pixels with depth in [50, 1000] mm
-                cv::Mat depth_mask = (f->cam.depth >= 50.0f) & (f->cam.depth <= 1000.0f);
+                // Mask out background: only keep pixels with depth in [50, max_depth_mm] mm
+                cv::Mat depth_mask = (f->cam.depth >= 50.0f) & (f->cam.depth <= cfg.max_depth_mm);
                 confidence_input = f->cam.confidence.clone();
                 confidence_input.setTo(0, ~depth_mask);
             }

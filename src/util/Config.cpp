@@ -21,6 +21,7 @@ Config Config::load(const std::string& path) {
         if (j.contains("camera_width")) cfg.camera_width  = j["camera_width"];
         if (j.contains("camera_height"))cfg.camera_height = j["camera_height"];
         if (j.contains("target_fps"))   cfg.target_fps  = j["target_fps"];
+        if (j.contains("max_depth_mm"))  cfg.max_depth_mm = j["max_depth_mm"];
         if (j.contains("yolo_model"))   cfg.yolo_model  = j["yolo_model"];
         if (j.contains("yolo_conf"))    cfg.yolo_conf   = j["yolo_conf"];
         if (j.contains("yolo_iou"))     cfg.yolo_iou    = j["yolo_iou"];

@@ -8,6 +8,7 @@ struct Config {
     int camera_width        = 240;
     int camera_height       = 180;
     int target_fps          = 30;
+    float max_depth_mm      = 1500.0f; // maximum depth for masking / tracking
 
     // model
     std::string yolo_model  = "models/yolov8n-hand-int8";

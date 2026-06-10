@@ -75,6 +75,10 @@ private:
     bool hasFrozenHand_ = false;
     bool hasSeenPreview_ = false;
 
+    enum class FadeState { NONE, FADE_OUT, FADE_IN };
+    FadeState fadeState_ = FadeState::NONE;
+    float fadeTimer_ = 0.0f;
+
     // Fibonacci sphere nodes
     static constexpr int NUM_NODES = 12;
     static constexpr float SPHERE_RADIUS = 1.2f;
@@ -89,6 +93,7 @@ private:
     GLuint mainShader_ = 0;
     GLuint starfieldShader_ = 0;
     GLuint freqShader_ = 0;
+    GLuint flatShader_ = 0;
 
     // Mesh VAOs and VBOs
     GLuint cubeVAO_ = 0, cubeVBO_ = 0;
