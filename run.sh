@@ -118,6 +118,12 @@ if [ "$OS" = "Darwin" ]; then
 else
     # Linux/Pi
     CONFIG="$ROOT/config.pi.json"
+    echo "  Killing any running instrument/SC/Tidal instances..."
+    pkill -9 -f "sclang" || true
+    pkill -9 -f "scsynth" || true
+    pkill -9 -f "ghci" || true
+    pkill -9 -f "instrument" || true
+    sleep 2
     SCLANG=$(command -v sclang || echo "")
     if [ -n "$SCLANG" ]; then
         # Initialize quarks/tidal-looper submodule if empty

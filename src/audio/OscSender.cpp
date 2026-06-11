@@ -141,14 +141,48 @@ void OscSender::setPreviewMute(bool muted) {
     preview_muted_ = muted;
     sendMute(preview_muted_ || prev_.muted);
 }
+void OscSender::setElapsedTime(float t) { elapsed_time_ = t; }
+void OscSender::setTargetNode(int idx) { target_node_idx_ = idx; }
 
 void OscSender::send(const HandList& hands, const MusicParams& p, const GameStateData& state, bool scInstruments) {
     if (!addr_) return;
 
-    // Per-hand: /hand id x y z_mm z_vel gesture_id (only if SC instruments enabled)
+    // Compute target node position
+    float tx = 0.0f, ty = 0.0f, tz = 0.0f;
+    bool hasTarget = (target_node_idx_ >= 0 && target_node_idx_ < 12);
+    if (hasTarget) {
+        float theta = target_node_idx_ * 2.39996f; // golden angle
+        ty = 1.0f - (target_node_idx_ / 11.0f) * 2.0f;
+        float radius = std::sqrt(1.0f - ty * ty);
+        tx = radius * std::cos(theta);
+        tz = radius * std::sin(theta);
+        tx *= 1.2f; ty *= 1.2f; tz *= 1.2f; // scale by SPHERE_RADIUS = 1.2
+
+        float theta_rot = elapsed_time_ * 0.04f;
+        float cosR = std::cos(theta_rot);
+        float sinR = std::sin(theta_rot);
+        float rx = tx * cosR - tz * sinR;
+        float rz = tx * sinR + tz * cosR;
+        tx = rx; tz = rz;
+    }
+
+    // Per-hand: /hand id x y z_mm z_vel gesture_id dist_factor (only if SC instruments enabled)
     std::set<int> active_buckets;
     if (scInstruments) {
         for (const auto& h : hands) {
+            float dist_factor = 1.0f;
+            if (hasTarget) {
+                float aspect = 16.f / 9.f;
+                float hx = (h.x * 2.0f - 1.0f) * 2.0f * aspect;
+                float hy = (1.0f - h.y * 2.0f) * 1.5f;
+                float hz = (h.z * 2.0f - 1.0f) * 1.5f;
+
+                float dist = std::sqrt((hx - tx)*(hx - tx) + (hy - ty)*(hy - ty) + (hz - tz)*(hz - tz));
+                dist_factor = dist / 3.0f;
+                if (dist_factor < 0.0f) dist_factor = 0.0f;
+                if (dist_factor > 1.0f) dist_factor = 1.0f;
+            }
+
 #ifdef HAVE_LIBLO
             lo_message m = lo_message_new();
             lo_message_add_int32(m, h.id);
@@ -157,6 +191,7 @@ void OscSender::send(const HandList& hands, const MusicParams& p, const GameStat
             lo_message_add_float(m, h.z_mm);
             lo_message_add_float(m, h.z_vel);
             lo_message_add_float(m, (float)(int)h.gesture);
+            lo_message_add_float(m, dist_factor);
             lo_send_message(addr_, "/hand", m);
             lo_message_free(m);
 #endif

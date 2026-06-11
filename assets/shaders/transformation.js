@@ -182,11 +182,23 @@ function setMute(muted) {
 
 function updateMelody() {
     // Send collected notes as space-separated note string to Tidal
-    if (collected === 0) { sendOsc('transformation_active', 0); return; }
-    const notes = sequence.slice(0, collected).map(idx => NOTE_NAMES[idx]).join(' ');
-    sendOsc('transformation_notes', notes);
-    sendOsc('transformation_active', 1);
-    sendOsc('transformation_count', collected);
+    if (collected === 0) { 
+        sendOsc('transformation_active', 0); 
+    } else {
+        const notes = sequence.slice(0, collected).map(idx => NOTE_NAMES[idx]).join(' ');
+        sendOsc('transformation_notes', notes);
+        sendOsc('transformation_active', 1);
+        sendOsc('transformation_count', collected);
+    }
+
+    // Send target to C++ backend
+    const host = window.apiHost || 'localhost';
+    const targetNode = (state === States.PLAYING && collected < NUM_NOTES) ? sequence[collected] : -1;
+    fetch('http://' + host + ':8080/target', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ target: targetNode })
+    }).catch(() => {});
 }
 
 // ---- Cell meshes ----
@@ -712,6 +724,7 @@ sequence = shuffle([0,1,2,3,4,5,6,7,8,9,10,11]).slice(0, NUM_NOTES);
                 updateCellVisuals();
                 state = States.PLAYING;
                 setMute(false);
+                updateMelody();
             }
         }
     }

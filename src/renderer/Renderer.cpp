@@ -773,6 +773,14 @@ void Renderer::updateCellVisuals(int i, glm::vec3& color, glm::vec3& emissive, f
 void Renderer::render(const HandList& hands, float dt) {
     if (!window_) return;
 
+    if (osc_) {
+        int target = -1;
+        if (state_ == VisualizerState::PLAYING && collected_ >= 0 && collected_ < (int)sequence_.size()) {
+            target = sequence_[collected_];
+        }
+        osc_->setTargetNode(target);
+    }
+
     // Window size might change
     glfwGetWindowSize(window_, &width_, &height_);
     int fbWidth, fbHeight;

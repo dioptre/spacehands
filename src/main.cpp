@@ -128,6 +128,7 @@ int main(int argc, char* argv[]) {
 
     // ---- Main loop: vision + game + broadcast ----
     auto t_last = std::chrono::steady_clock::now();
+    auto start_time = std::chrono::steady_clock::now();
     HandList last_hands;
 
     while (g_running) {
@@ -241,6 +242,8 @@ int main(int argc, char* argv[]) {
             auto music = mapper.map(hands, state);
 
             // OSC: per-hand depth-bucket messages + global params
+            float elapsed_sec = std::chrono::duration<float>(std::chrono::steady_clock::now() - start_time).count();
+            osc.setElapsedTime(elapsed_sec);
             osc.send(hands, music, state, cfg.sc_instruments);
             // OSC: pool assignments → Tidal /ctrl
             osc.sendPool(pool, hands, music);

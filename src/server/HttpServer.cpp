@@ -142,6 +142,26 @@ void HttpServer::start() {
             res.status = 204;
         });
 
+        // /target POST — active target node index from browser
+        svr.Post("/target", [this](const httplib::Request& req, httplib::Response& res) {
+            try {
+                auto j = nlohmann::json::parse(req.body);
+                int target = j.value("target", -1);
+                if (osc_) {
+                    osc_->setTargetNode(target);
+                }
+            } catch (...) {}
+            res.set_content("ok", "text/plain");
+            res.set_header("Access-Control-Allow-Origin", "*");
+        });
+
+        svr.Options("/target", [](const httplib::Request&, httplib::Response& res) {
+            res.set_header("Access-Control-Allow-Origin",  "*");
+            res.set_header("Access-Control-Allow-Methods", "POST, OPTIONS");
+            res.set_header("Access-Control-Allow-Headers", "Content-Type");
+            res.status = 204;
+        });
+
         std::cout << "[HttpServer] serving " << assets_dir_ << " on port " << port_ << "\n";
         svr.listen("0.0.0.0", port_);
     });

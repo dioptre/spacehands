@@ -30,6 +30,8 @@ public:
     void sendDirtPlay(int midi, float amp, float decay);
     void sendMute(bool muted);
     void setPreviewMute(bool muted);
+    void setElapsedTime(float t);
+    void setTargetNode(int idx);
 
 private:
     std::string host_;
@@ -45,6 +47,8 @@ private:
     MusicParams prev_;
     bool first_ = true;
     bool preview_muted_ = false;
+    float elapsed_time_ = 0.0f;
+    int target_node_idx_ = -1;
 
     void sendInstrument(int id);
     void sendNote(int pitch, float velocity);

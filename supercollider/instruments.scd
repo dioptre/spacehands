@@ -49,6 +49,7 @@ if (~instrumentWatchdog.notNil) { ~instrumentWatchdog.stop; };
                 var x = hand[\x];
                 var y = hand[\y];
                 var z = hand[\z];
+                var distFactor = hand[\distFactor] ? 1.0;
                 
                 if ((~dirt.notNil) && (~instrumentMuted != true)) {
                     var sd = NetAddr.new("127.0.0.1", 57120);
@@ -59,13 +60,15 @@ if (~instrumentWatchdog.notNil) { ~instrumentWatchdog.stop; };
                         \sustain, z.linexp(0, 1, 0.1, 2.5),
                         \room, z.linlin(0, 1, 0.1, 0.9),
                         \verbwet, z.linlin(0, 1, 0.1, 0.9),
-                        \pan, x.linlin(0, 1, -0.8, 0.8)
+                        \pan, x.linlin(0, 1, -0.8, 0.8),
+                        \cutoff, x.linexp(0, 1, 150, 15000),
+                        \resonance, x.linlin(0, 1, 0.0, 0.8)
                     );
                 };
                 
                 hand[\readIndex] = (noteIdx + 1) % 12;
-                // x = 0 (left) -> slow cycle, x = 1 (right) -> fast cycle
-                waitTime = x.linexp(0, 1, 1.2, 0.08);
+                // Speed (tempo) is controlled by distFactor (closer = faster playback)
+                waitTime = distFactor.linexp(0, 1, 0.08, 1.2);
                 waitTime.wait;
             };
         }).play;
@@ -73,17 +76,18 @@ if (~instrumentWatchdog.notNil) { ~instrumentWatchdog.stop; };
 };
 
 OSCdef(\hand, { |msg|
-    var handId, xRaw, yRaw, zRaw, zVel, gesture;
+    var handId, xRaw, yRaw, zRaw, zVel, gesture, distFactor;
     var xNorm, yNorm, zNorm;
     var noteIndex, pitch;
     var now, hand;
 
-    handId  = msg[1].asInteger;
-    xRaw    = msg[2].asFloat;
-    yRaw    = msg[3].asFloat;
-    zRaw    = msg[4].asFloat;
-    zVel    = msg[5].asFloat;
-    gesture = msg[6].asInteger;
+    handId     = msg[1].asInteger;
+    xRaw       = msg[2].asFloat;
+    yRaw       = msg[3].asFloat;
+    zRaw       = msg[4].asFloat;
+    zVel       = msg[5].asFloat;
+    gesture    = msg[6].asInteger;
+    distFactor = msg[7].asFloat;
 
     now = Main.elapsedTime;
 
@@ -114,6 +118,7 @@ OSCdef(\hand, { |msg|
             \x, xNorm,
             \y, yNorm,
             \z, zNorm,
+            \distFactor, distFactor,
             \lastNote, nil,
             \lastWriteTime, 0,
             \lastSeenTime, now,
@@ -130,6 +135,7 @@ OSCdef(\hand, { |msg|
     hand[\x] = xNorm;
     hand[\y] = yNorm;
     hand[\z] = zNorm;
+    hand[\distFactor] = distFactor;
 
     // Push note to ring buffer if it changes (with debounce)
     if ((pitch != hand[\lastNote]) && ((now - hand[\lastWriteTime]) > 0.15)) {
@@ -150,7 +156,9 @@ OSCdef(\hand, { |msg|
                 \sustain, zNorm.linexp(0, 1, 0.1, 2.5),
                 \room, zNorm.linlin(0, 1, 0.1, 0.9),
                 \verbwet, zNorm.linlin(0, 1, 0.1, 0.9),
-                \pan, xNorm.linlin(0, 1, -0.8, 0.8)
+                \pan, xNorm.linlin(0, 1, -0.8, 0.8),
+                \cutoff, xNorm.linexp(0, 1, 150, 15000),
+                \resonance, xNorm.linlin(0, 1, 0.0, 0.8)
             );
         };
     };
