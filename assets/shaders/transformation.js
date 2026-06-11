@@ -504,11 +504,27 @@ function updateCellVisuals() {
             // Current target — bright when hints on, otherwise same as future nodes
             const showHintsCfg = window.instrumentState.show_hints !== false;
             const hintBright = (window.showHints !== false) && (showHintsCfg || collected === 0);
-            c.mesh.material.color.setHex(hintBright ? 0xffffff : 0x1a2266);
-            c.mesh.material.emissive.setHex(hintBright ? 0x4422aa : 0x0a0f44);
-            c.mesh.material.opacity = hintBright ? 0.9 : 0.5;
-            c.wf.material.opacity = hintBright ? 1.0 : 0.35;
-            c.wf.material.color.setHex(hintBright ? 0xffffff : 0x3355aa);
+            if (hintBright) {
+                c.mesh.material.color.setHex(0xffffff);
+                c.mesh.material.emissive.setHex(0x4422aa);
+                c.mesh.material.opacity = 0.9;
+                c.wf.material.opacity = 1.0;
+                c.wf.material.color.setHex(0xffffff);
+            } else {
+                if (!showHintsCfg) {
+                    c.mesh.material.color.setHex(0x0a1033);
+                    c.mesh.material.emissive.setHex(0x050818);
+                    c.mesh.material.opacity = 0.35;
+                    c.wf.material.opacity = 0.2;
+                    c.wf.material.color.setHex(0x223355);
+                } else {
+                    c.mesh.material.color.setHex(0x1a2266);
+                    c.mesh.material.emissive.setHex(0x0a0f44);
+                    c.mesh.material.opacity = 0.5;
+                    c.wf.material.opacity = 0.35;
+                    c.wf.material.color.setHex(0x3355aa);
+                }
+            }
             if (aliens[i]) aliens[i].visible = true;
             if (labels[i]) labels[i].material.opacity = (window.showLabels && hintBright) ? 0.9 : 0.0;
         } else if (isDecoy) {
@@ -522,11 +538,20 @@ function updateCellVisuals() {
             if (labels[i]) labels[i].material.opacity = 0.0; // no label on decoys
         } else {
             // Future note in sequence — medium blue
-            c.mesh.material.color.setHex(0x1a2266);
-            c.mesh.material.emissive.setHex(0x0a0f44);
-            c.mesh.material.opacity = 0.5;
-            c.wf.material.opacity = 0.35;
-            c.wf.material.color.setHex(0x3355aa);
+            const showHintsCfg = window.instrumentState.show_hints !== false;
+            if (!showHintsCfg) {
+                c.mesh.material.color.setHex(0x0a1033);
+                c.mesh.material.emissive.setHex(0x050818);
+                c.mesh.material.opacity = 0.35;
+                c.wf.material.opacity = 0.2;
+                c.wf.material.color.setHex(0x223355);
+            } else {
+                c.mesh.material.color.setHex(0x1a2266);
+                c.mesh.material.emissive.setHex(0x0a0f44);
+                c.mesh.material.opacity = 0.5;
+                c.wf.material.opacity = 0.35;
+                c.wf.material.color.setHex(0x3355aa);
+            }
             if (aliens[i]) aliens[i].visible = true;
             if (labels[i]) labels[i].material.opacity = 0.0;
         }

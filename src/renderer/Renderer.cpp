@@ -755,18 +755,30 @@ void Renderer::updateCellVisuals(int i, glm::vec3& color, glm::vec3& emissive, f
             emissive = glm::vec3(0.26f, 0.13f, 0.66f);
             opacity = 0.9f;
         } else {
-            color = glm::vec3(0.1f, 0.13f, 0.4f);
-            emissive = glm::vec3(0.04f, 0.06f, 0.26f);
-            opacity = 0.5f;
+            if (cfg_ && !cfg_->show_hints) {
+                color = glm::vec3(0.04f, 0.06f, 0.2f);
+                emissive = glm::vec3(0.02f, 0.03f, 0.09f);
+                opacity = 0.35f;
+            } else {
+                color = glm::vec3(0.1f, 0.13f, 0.4f);
+                emissive = glm::vec3(0.04f, 0.06f, 0.26f);
+                opacity = 0.5f;
+            }
         }
     } else if (isDecoy) {
         color = glm::vec3(0.04f, 0.06f, 0.2f);
         emissive = glm::vec3(0.02f, 0.03f, 0.09f);
         opacity = 0.35f;
     } else {
-        color = glm::vec3(0.1f, 0.13f, 0.4f);
-        emissive = glm::vec3(0.04f, 0.06f, 0.26f);
-        opacity = 0.5f;
+        if (cfg_ && !cfg_->show_hints) {
+            color = glm::vec3(0.04f, 0.06f, 0.2f);
+            emissive = glm::vec3(0.02f, 0.03f, 0.09f);
+            opacity = 0.35f;
+        } else {
+            color = glm::vec3(0.1f, 0.13f, 0.4f);
+            emissive = glm::vec3(0.04f, 0.06f, 0.26f);
+            opacity = 0.5f;
+        }
     }
 }
 
