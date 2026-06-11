@@ -43,6 +43,7 @@ struct Config {
     int  crop_left          = 0;
     int  crop_right         = 0;
     bool show_hints         = true;
+    bool show_preview_history = false;
 
     static Config load(const std::string& path);
 };

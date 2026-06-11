@@ -295,11 +295,16 @@ int main(int argc, char* argv[]) {
             }
 
             // WebSocket: broadcast full state
+            std::vector<int> current_seq;
+            if (visualizer) {
+                current_seq = visualizer->getSequence();
+            }
             ws.broadcast(state, hands, cfg.mirror_x,
                          cfg.coord_x_min, cfg.coord_x_max,
                          cfg.coord_y_min, cfg.coord_y_max,
                          cfg.coord_z_min, cfg.coord_z_max,
-                         cfg.show_hints);
+                         cfg.show_hints, cfg.show_preview_history,
+                         current_seq);
 
             last_hands = hands;
         }

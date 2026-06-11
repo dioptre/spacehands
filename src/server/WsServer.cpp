@@ -22,7 +22,8 @@ struct AxisRange {
 
 static std::string buildJson(const GameStateData& state, const HandList& hands, bool mirrorX,
                               float xMin, float xMax, float yMin, float yMax, float zMin, float zMax,
-                              bool showHints) {
+                              bool showHints, bool showPreviewHistory,
+                              const std::vector<int>& sequence) {
     using json = nlohmann::json;
     AxisRange rx(xMin, xMax), ry(yMin, yMax), rz(zMin, zMax);
 
@@ -34,6 +35,10 @@ static std::string buildJson(const GameStateData& state, const HandList& hands, 
     j["num_hands"]  = (int)hands.size();
     j["fx"]         = { {"reverb", state.music.reverb} };
     j["show_hints"] = showHints;
+    j["show_preview_history"] = showPreviewHistory;
+    if (!sequence.empty()) {
+        j["sequence"] = sequence;
+    }
 
     float cx = 0, cy = 0;
     json jarr = json::array();
@@ -56,9 +61,10 @@ static std::string buildJson(const GameStateData& state, const HandList& hands, 
 
 void WsServer::broadcast(const GameStateData& state, const HandList& hands, bool mirrorX,
                           float xMin, float xMax, float yMin, float yMax, float zMin, float zMax,
-                          bool showHints) {
+                          bool showHints, bool showPreviewHistory,
+                          const std::vector<int>& sequence) {
     std::lock_guard<std::mutex> lk(mutex_);
-    latest_json_ = buildJson(state, hands, mirrorX, xMin, xMax, yMin, yMax, zMin, zMax, showHints);
+    latest_json_ = buildJson(state, hands, mirrorX, xMin, xMax, yMin, yMax, zMin, zMax, showHints, showPreviewHistory, sequence);
 }
 
 void WsServer::start() {

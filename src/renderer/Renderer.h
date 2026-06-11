@@ -47,6 +47,8 @@ public:
     void render(const HandList& hands, float dt);
     void close();
     bool shouldClose() const;
+    const std::vector<int>& getSequence() const { return sequence_; }
+
 
 private:
     // Window state

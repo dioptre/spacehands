@@ -141,7 +141,12 @@ function shuffle(arr) {
 
 function resetGame() {
     // Pick 6 random nodes from 12 to be note targets
-sequence = shuffle([0,1,2,3,4,5,6,7,8,9,10,11]).slice(0, NUM_NOTES);
+    const st = window.instrumentState;
+    if (st && st.sequence && st.sequence.length > 0) {
+        sequence = st.sequence;
+    } else {
+        sequence = shuffle([0,1,2,3,4,5,6,7,8,9,10,11]).slice(0, NUM_NOTES);
+    }
     collected = 0;
     holdTimer = 0;
     idleTimer = 0;
@@ -591,6 +596,9 @@ function animate() {
     frameCount++;
 
     const st = window.instrumentState;
+    if (st && st.sequence && st.sequence.length > 0) {
+        sequence = st.sequence;
+    }
     const hands = (st && st.hands) || [];
     const numHands = hands.length;
 
@@ -649,7 +657,12 @@ function animate() {
     sequenceAge += dt;
     if (sequenceAge >= SEQUENCE_RESHUFFLE && state === States.IDLE && numHands === 0) {
         // Pick 6 random nodes from 12 to be note targets
-sequence = shuffle([0,1,2,3,4,5,6,7,8,9,10,11]).slice(0, NUM_NOTES);
+        const st = window.instrumentState;
+        if (st && st.sequence && st.sequence.length > 0) {
+            sequence = st.sequence;
+        } else {
+            sequence = shuffle([0,1,2,3,4,5,6,7,8,9,10,11]).slice(0, NUM_NOTES);
+        }
         sequenceAge = 0;
         hasSeenPreview = false; // allow preview of new sequence
         updateCellVisuals();
@@ -666,7 +679,7 @@ sequence = shuffle([0,1,2,3,4,5,6,7,8,9,10,11]).slice(0, NUM_NOTES);
                 state = States.SEQUENCE_PREVIEW;
                 setMute(true);
                 previewStep = 0;
-                previewTimer = 0;
+                previewTimer = -1.0; // 1s initial mute delay
                 // Dim all cells for preview
                 cells.forEach(c => {
                     c.mesh.material.color.setHex(0x001122);
@@ -683,41 +696,54 @@ sequence = shuffle([0,1,2,3,4,5,6,7,8,9,10,11]).slice(0, NUM_NOTES);
 
     else if (state === States.SEQUENCE_PREVIEW) {
         previewTimer += dt;
-        // Light up current preview cell
-        cells.forEach((c, i) => {
-            if (i === sequence[previewStep]) {
-                c.mesh.material.color.setHex(0xffffff);
-                c.mesh.material.emissive.setHex(0x6633ff);
-                c.mesh.material.opacity = 1.0;
-                c.wf.material.color.setHex(0xffffff);
-                c.wf.material.opacity = 1.0;
-                c.mesh.scale.setScalar(1.2 + Math.sin(t * 8) * 0.08);
-            } else if (i < previewStep) {
-                // Already shown — dim but leave visible
-                c.mesh.material.color.setHex(0x112244);
-                c.mesh.material.opacity = 0.35;
-                c.wf.material.opacity = 0.2;
-            } else {
+        
+        if (previewTimer < 0) {
+            // Delay phase: keep all cells dimmed
+            cells.forEach(c => {
                 c.mesh.material.color.setHex(0x001122);
                 c.mesh.material.opacity = 0.15;
                 c.wf.material.opacity = 0.08;
-            }
-        });
+            });
+        } else {
+            // Light up current preview cell
+            const activeStep = previewStep > 0 ? previewStep - 1 : 0;
+            cells.forEach((c, i) => {
+                if (i === sequence[activeStep]) {
+                    c.mesh.material.color.setHex(0xffffff);
+                    c.mesh.material.emissive.setHex(0x6633ff);
+                    c.mesh.material.opacity = 1.0;
+                    c.wf.material.color.setHex(0xffffff);
+                    c.wf.material.opacity = 1.0;
+                    c.mesh.scale.setScalar(1.2 + Math.sin(t * 8) * 0.08);
+                } else if (sequence.slice(0, activeStep).includes(i) && window.instrumentState.show_preview_history === true) {
+                    // Already shown — dim but leave visible
+                    c.mesh.material.color.setHex(0x112244);
+                    c.mesh.material.opacity = 0.35;
+                    c.wf.material.opacity = 0.2;
+                } else {
+                    c.mesh.material.color.setHex(0x001122);
+                    c.mesh.material.opacity = 0.15;
+                    c.wf.material.opacity = 0.08;
+                }
+            });
 
-        if (previewTimer >= PREVIEW_STEP_TIME) {
-            previewTimer = 0;
-            console.log('[transform] preview step', previewStep, 'of 8');
-            // Play this cell's note as a clean one-shot directly in SC
-            const noteIdx = sequence[previewStep];
-            const MIDI = [60, 62, 64, 67, 69, 72, 74, 76]; // C4 D4 E4 G4 A4 C5 D5 E5
-            const host = window.apiHost || 'localhost';
-            fetch('http://' + host + ':8080/note', {
-                method: 'POST',
-                headers: {'Content-Type':'application/json'},
-                body: JSON.stringify({ midi: MIDI[noteIdx], amp: 0.75, decay: 0.4 })
-            }).catch(() => {});
-            previewStep++;
-            if (previewStep >= NUM_NOTES) {
+            if (previewStep < NUM_NOTES) {
+                const targetTime = previewStep * PREVIEW_STEP_TIME;
+                if (previewTimer >= targetTime) {
+                    console.log('[transform] preview step', previewStep, 'of 6');
+                    // Play this cell's note as a clean one-shot directly in SC
+                    const noteIdx = sequence[previewStep];
+                    const host = window.apiHost || 'localhost';
+                    fetch('http://' + host + ':8080/note', {
+                        method: 'POST',
+                        headers: {'Content-Type':'application/json'},
+                        body: JSON.stringify({ midi: PENTA[noteIdx], amp: 0.75, decay: 0.4 })
+                    }).catch(() => {});
+                    previewStep++;
+                }
+            }
+
+            if (previewTimer >= NUM_NOTES * PREVIEW_STEP_TIME) {
                 // Preview complete — start game
                 hasSeenPreview = true;
                 lastPreviewTime = clock.getElapsedTime();
@@ -801,7 +827,6 @@ sequence = shuffle([0,1,2,3,4,5,6,7,8,9,10,11]).slice(0, NUM_NOTES);
             if (holdTimer >= 1.0) {
                 // COLLECTED! Play same note as preview via /note
                 burstParticles(GRID_POSITIONS[sequence[collected]]);
-                const MIDI = [60, 62, 64, 67, 69, 72, 74, 76];
                 const collectedMidi = PENTA[sequence[collected]];
                 const host = window.apiHost || 'localhost';
                 fetch('http://' + host + ':8080/note', {

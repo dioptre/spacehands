@@ -841,7 +841,7 @@ void Renderer::render(const HandList& hands, float dt) {
             if (glfwGetTime() - lastPreviewTime_ >= 40.0f) {
                 state_ = VisualizerState::SEQUENCE_PREVIEW;
                 previewStep_ = 0;
-                previewTimer_ = 0.0f;
+                previewTimer_ = -1.0f; // 1s initial mute delay
                 osc_->setPreviewMute(true); // mute hand instruments during preview
             } else {
                 state_ = VisualizerState::PLAYING;
@@ -852,12 +852,17 @@ void Renderer::render(const HandList& hands, float dt) {
     } 
     else if (state_ == VisualizerState::SEQUENCE_PREVIEW) {
         previewTimer_ += dt;
-        if (previewTimer_ >= 0.7f) {
-            previewTimer_ = 0.0f;
-            int noteIdx = sequence_[previewStep_];
-            osc_->sendDirtPlay(PENTA[noteIdx], 0.75f, 0.4f);
-            previewStep_++;
-            if (previewStep_ >= 6) {
+        
+        if (previewTimer_ >= 0.0f) {
+            if (previewStep_ < 6) {
+                float targetTime = previewStep_ * 0.7f;
+                if (previewTimer_ >= targetTime) {
+                    int noteIdx = sequence_[previewStep_];
+                    osc_->sendDirtPlay(PENTA[noteIdx], 0.75f, 0.4f);
+                    previewStep_++;
+                }
+            }
+            if (previewTimer_ >= 6 * 0.7f) {
                 hasSeenPreview_ = true;
                 lastPreviewTime_ = glfwGetTime();
                 state_ = VisualizerState::PLAYING;
@@ -979,20 +984,28 @@ void Renderer::render(const HandList& hands, float dt) {
             updateCellVisuals(i, cellColor, emissiveColor, opacity, scale, drawWireframe);
 
             if (state_ == VisualizerState::SEQUENCE_PREVIEW) {
-                int previewNode = sequence_[previewStep_];
-                if (i == previewNode) {
-                    cellColor = glm::vec3(1.0f, 1.0f, 1.0f);
-                    emissiveColor = glm::vec3(0.4f, 0.2f, 1.0f);
-                    opacity = 1.0f;
-                    scale = 1.2f + 0.08f * std::sin(glfwGetTime() * 8.0f);
-                } else if (i < previewStep_) {
-                    cellColor = glm::vec3(0.06f, 0.13f, 0.26f);
-                    emissiveColor = glm::vec3(0.0f);
-                    opacity = 0.35f;
-                } else {
+                if (previewTimer_ < 0.0f) {
+                    // Delay phase: keep all cells dimmed
                     cellColor = glm::vec3(0.0f, 0.06f, 0.13f);
                     emissiveColor = glm::vec3(0.0f);
                     opacity = 0.15f;
+                } else {
+                    int activeStep = previewStep_ > 0 ? previewStep_ - 1 : 0;
+                    int previewNode = sequence_[activeStep];
+                    if (i == previewNode) {
+                        cellColor = glm::vec3(1.0f, 1.0f, 1.0f);
+                        emissiveColor = glm::vec3(0.4f, 0.2f, 1.0f);
+                        opacity = 1.0f;
+                        scale = 1.2f + 0.08f * std::sin(glfwGetTime() * 8.0f);
+                    } else if (cfg_->show_preview_history && std::find(sequence_.begin(), sequence_.begin() + activeStep, i) != sequence_.begin() + activeStep) {
+                        cellColor = glm::vec3(0.06f, 0.13f, 0.26f);
+                        emissiveColor = glm::vec3(0.0f);
+                        opacity = 0.35f;
+                    } else {
+                        cellColor = glm::vec3(0.0f, 0.06f, 0.13f);
+                        emissiveColor = glm::vec3(0.0f);
+                        opacity = 0.15f;
+                    }
                 }
             }
 
@@ -1003,7 +1016,8 @@ void Renderer::render(const HandList& hands, float dt) {
             drawCube(model, cellColor, emissiveColor, opacity, false);
 
             if (drawWireframe) {
-                glm::vec3 wireColor = (state_ == VisualizerState::SEQUENCE_PREVIEW && i == sequence_[previewStep_]) 
+                int activeStep = previewStep_ > 0 ? previewStep_ - 1 : 0;
+                glm::vec3 wireColor = (state_ == VisualizerState::SEQUENCE_PREVIEW && previewTimer_ >= 0.0f && i == sequence_[activeStep]) 
                     ? glm::vec3(1.0f) : glm::vec3(0.2f, 0.4f, 1.0f);
                 drawCube(model, glm::vec3(0.0f), wireColor, opacity * 0.8f, true);
             }

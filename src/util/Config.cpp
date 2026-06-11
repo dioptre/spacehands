@@ -49,6 +49,7 @@ Config Config::load(const std::string& path) {
         if (j.contains("crop_left"))         cfg.crop_left         = j["crop_left"];
         if (j.contains("crop_right"))        cfg.crop_right        = j["crop_right"];
         if (j.contains("show_hints"))        cfg.show_hints        = j["show_hints"];
+        if (j.contains("show_preview_history")) cfg.show_preview_history = j["show_preview_history"];
     } catch (const std::exception& e) {
         std::cerr << "[Config] parse error: " << e.what() << "\n";
     }

@@ -17,5 +17,6 @@
   "visualizer_width":  960,
   "visualizer_height": 540,
   "fullscreen":        true,
-  "show_hints":        false
+  "show_hints":        false,
+  "show_preview_history": false
 }
