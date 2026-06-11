@@ -668,6 +668,7 @@ void Renderer::resetGame() {
     previewTimer_ = 0.0f;
     sequenceAge_ = 0.0f;
     state_ = VisualizerState::IDLE;
+    osc_->setPreviewMute(false);
 
     updateMelody();
 }
@@ -745,9 +746,19 @@ void Renderer::updateCellVisuals(int i, glm::vec3& color, glm::vec3& emissive, f
         opacity = 0.2f;
         scale = 0.8f;
     } else if (isActive) {
-        color = glm::vec3(1.0f, 1.0f, 1.0f);
-        emissive = glm::vec3(0.26f, 0.13f, 0.66f);
-        opacity = 0.9f;
+        bool highlight = true;
+        if (cfg_ && !cfg_->show_hints && collected_ > 0) {
+            highlight = false;
+        }
+        if (highlight) {
+            color = glm::vec3(1.0f, 1.0f, 1.0f);
+            emissive = glm::vec3(0.26f, 0.13f, 0.66f);
+            opacity = 0.9f;
+        } else {
+            color = glm::vec3(0.1f, 0.13f, 0.4f);
+            emissive = glm::vec3(0.04f, 0.06f, 0.26f);
+            opacity = 0.5f;
+        }
     } else if (isDecoy) {
         color = glm::vec3(0.04f, 0.06f, 0.2f);
         emissive = glm::vec3(0.02f, 0.03f, 0.09f);
@@ -823,6 +834,7 @@ void Renderer::render(const HandList& hands, float dt) {
                 state_ = VisualizerState::SEQUENCE_PREVIEW;
                 previewStep_ = 0;
                 previewTimer_ = 0.0f;
+                osc_->setPreviewMute(true); // mute hand instruments during preview
             } else {
                 state_ = VisualizerState::PLAYING;
             }
@@ -841,6 +853,7 @@ void Renderer::render(const HandList& hands, float dt) {
                 hasSeenPreview_ = true;
                 lastPreviewTime_ = glfwGetTime();
                 state_ = VisualizerState::PLAYING;
+                osc_->setPreviewMute(false); // unmute hand instruments for gameplay
             }
         }
     } 

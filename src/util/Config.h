@@ -42,6 +42,7 @@ struct Config {
     bool fullscreen         = false;
     int  crop_left          = 0;
     int  crop_right         = 0;
+    bool show_hints         = true;
 
     static Config load(const std::string& path);
 };

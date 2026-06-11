@@ -137,6 +137,10 @@ void OscSender::sendSpatial(float x, float y) {
 }
 void OscSender::sendLevel(int level) { sendMsgI(addr_, "/level", level); }
 void OscSender::sendMute(bool muted) { sendMsgI(addr_, "/mute", muted ? 1 : 0); }
+void OscSender::setPreviewMute(bool muted) {
+    preview_muted_ = muted;
+    sendMute(preview_muted_ || prev_.muted);
+}
 
 void OscSender::send(const HandList& hands, const MusicParams& p, const GameStateData& state, bool scInstruments) {
     if (!addr_) return;
@@ -228,7 +232,7 @@ void OscSender::send(const HandList& hands, const MusicParams& p, const GameStat
     if (first_ || std::fabs(p.reverb - prev_.reverb) > 0.02f ||
                   std::fabs(p.delay  - prev_.delay)  > 0.02f) sendFx(p.reverb, p.delay);
     if (first_ || std::fabs(p.pan    - prev_.pan)    > 0.05f) sendSpatial(p.pan, 0.f);
-    if (first_ || p.muted != prev_.muted)                      sendMute(p.muted);
+    if (first_ || p.muted != prev_.muted)                      sendMute(preview_muted_ || p.muted);
     if (!p.muted) {
         int pitch = (int)std::round(p.pitch);
         if (first_ || pitch != (int)std::round(prev_.pitch) ||

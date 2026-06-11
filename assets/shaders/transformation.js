@@ -156,6 +156,7 @@ sequence = shuffle([0,1,2,3,4,5,6,7,8,9,10,11]).slice(0, NUM_NOTES);
     updateCellVisuals();
     updateMelody();
     state = States.IDLE;
+    setMute(false);
     if (wormholeRing) { wormholeRing.scale.setScalar(0.01); wormholeRing.material.opacity = 0; }
     if (congratsOverlay) { congratsOverlay.style.opacity = 0; congratsOverlay.style.display = 'none'; }
 }
@@ -167,6 +168,15 @@ function sendOsc(key, val) {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ ctrl: key, value: val })
+    }).catch(() => {});
+}
+
+function setMute(muted) {
+    const host = window.apiHost || 'localhost';
+    fetch('http://' + host + ':8080/mute', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ muted: muted })
     }).catch(() => {});
 }
 
@@ -475,7 +485,8 @@ function updateCellVisuals() {
             if (labels[i]) labels[i].material.opacity = 0.0;
         } else if (isActive) {
             // Current target — bright when hints on, otherwise same as future nodes
-            const hintBright = window.showHints !== false;
+            const showHintsCfg = window.instrumentState.show_hints !== false;
+            const hintBright = (window.showHints !== false) && (showHintsCfg || collected === 0);
             c.mesh.material.color.setHex(hintBright ? 0xffffff : 0x1a2266);
             c.mesh.material.emissive.setHex(hintBright ? 0x4422aa : 0x0a0f44);
             c.mesh.material.opacity = hintBright ? 0.9 : 0.5;
@@ -641,6 +652,7 @@ sequence = shuffle([0,1,2,3,4,5,6,7,8,9,10,11]).slice(0, NUM_NOTES);
                 // Show preview — either first time or cooldown elapsed
                 console.log('[transform] starting sequence preview');
                 state = States.SEQUENCE_PREVIEW;
+                setMute(true);
                 previewStep = 0;
                 previewTimer = 0;
                 // Dim all cells for preview
@@ -699,6 +711,7 @@ sequence = shuffle([0,1,2,3,4,5,6,7,8,9,10,11]).slice(0, NUM_NOTES);
                 lastPreviewTime = clock.getElapsedTime();
                 updateCellVisuals();
                 state = States.PLAYING;
+                setMute(false);
             }
         }
     }

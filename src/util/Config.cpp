@@ -48,6 +48,7 @@ Config Config::load(const std::string& path) {
         if (j.contains("fullscreen"))        cfg.fullscreen        = j["fullscreen"];
         if (j.contains("crop_left"))         cfg.crop_left         = j["crop_left"];
         if (j.contains("crop_right"))        cfg.crop_right        = j["crop_right"];
+        if (j.contains("show_hints"))        cfg.show_hints        = j["show_hints"];
     } catch (const std::exception& e) {
         std::cerr << "[Config] parse error: " << e.what() << "\n";
     }

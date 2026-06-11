@@ -28,6 +28,8 @@ public:
     void sendTidalCtrl(const char* key, float val);
     void sendTidalCtrlStr(const char* key, const char* val);
     void sendDirtPlay(int midi, float amp, float decay);
+    void sendMute(bool muted);
+    void setPreviewMute(bool muted);
 
 private:
     std::string host_;
@@ -42,6 +44,7 @@ private:
 
     MusicParams prev_;
     bool first_ = true;
+    bool preview_muted_ = false;
 
     void sendInstrument(int id);
     void sendNote(int pitch, float velocity);
@@ -49,5 +52,4 @@ private:
     void sendFx(float reverb, float delay);
     void sendSpatial(float x, float y);
     void sendLevel(int level);
-    void sendMute(bool muted);
 };

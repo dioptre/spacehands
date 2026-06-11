@@ -12,6 +12,8 @@ scale = [48, 50, 52, 55, 57, 60, 62, 64, 67, 69, 72, 74, 76, 79, 81, 84, 86, 89,
 
 melodyInstruments = [\superpiano, \supervibe, \superhammond, \supermandolin, \supersaw, \supersquare, \supergong];
 
+~instrumentMuted = false;
+
 // Global calibration bounds
 ~xMin = ~xMin ? 0.2;
 ~xMax = ~xMax ? 0.8;
@@ -48,7 +50,7 @@ if (~instrumentWatchdog.notNil) { ~instrumentWatchdog.stop; };
                 var y = hand[\y];
                 var z = hand[\z];
                 
-                if (~dirt.notNil) {
+                if ((~dirt.notNil) && (~instrumentMuted != true)) {
                     var sd = NetAddr.new("127.0.0.1", 57120);
                     sd.sendMsg("/dirt/play",
                         \cps, 0.5, \cycle, 0, \delta, 0.5, \orbit, orbit,
@@ -117,7 +119,9 @@ OSCdef(\hand, { |msg|
             \lastSeenTime, now,
             \routine, nil
         ]);
-        ~startHandLoop.(handId);
+        if (~instrumentMuted != true) {
+            ~startHandLoop.(handId);
+        };
         ("Hand " ++ handId ++ " detected. Instrument: " ++ ~handsState[handId][\instrument]).postln;
     };
 
@@ -136,7 +140,7 @@ OSCdef(\hand, { |msg|
         hand[\lastWriteTime] = now;
 
         // Trigger note immediately on movement for high responsiveness
-        if (~dirt.notNil) {
+        if ((~dirt.notNil) && (~instrumentMuted != true)) {
             var sd = NetAddr.new("127.0.0.1", 57120);
             var orbit = (handId % 11) + 1;
             sd.sendMsg("/dirt/play",
@@ -151,6 +155,29 @@ OSCdef(\hand, { |msg|
         };
     };
 }, '/hand');
+
+OSCdef(\mute_resp, { |msg|
+    var val = msg[1].asInteger;
+    var wasMuted = ~instrumentMuted;
+    ~instrumentMuted = (val == 1);
+    if (~instrumentMuted == true) {
+        ~handsState.keysValuesDo { |handId, hand|
+            if (hand[\routine].notNil) {
+                hand[\routine].stop;
+                hand[\routine] = nil;
+            };
+        };
+    } {
+        if (wasMuted == true) {
+            ~handsState.keysValuesDo { |handId, hand|
+                if (hand[\routine].isNil) {
+                    ~startHandLoop.(handId);
+                };
+            };
+        };
+    };
+    ("Instrument mute state: " ++ ~instrumentMuted).postln;
+}, '/mute');
 
 // Watchdog — check for stale hands and stop their playback routines
 ~instrumentWatchdog = Task({

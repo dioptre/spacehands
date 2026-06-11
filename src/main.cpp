@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
 
     // ---- Servers ----
     // Assets dir: relative to binary (copied by CMake post-build)
-    HttpServer    http("assets", cfg.http_port);
+    HttpServer    http("assets", cfg.http_port, &osc);
     WsServer      ws(cfg.ws_port);
     MjpegStreamer mjpeg(cfg.mjpeg_port);
 
@@ -295,7 +295,8 @@ int main(int argc, char* argv[]) {
             ws.broadcast(state, hands, cfg.mirror_x,
                          cfg.coord_x_min, cfg.coord_x_max,
                          cfg.coord_y_min, cfg.coord_y_max,
-                         cfg.coord_z_min, cfg.coord_z_max);
+                         cfg.coord_z_min, cfg.coord_z_max,
+                         cfg.show_hints);
 
             last_hands = hands;
         }

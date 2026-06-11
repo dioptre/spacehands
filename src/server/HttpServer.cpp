@@ -1,4 +1,5 @@
 #include "HttpServer.h"
+#include "../audio/OscSender.h"
 #include <httplib.h>
 #include <iostream>
 #include <cmath>
@@ -12,8 +13,8 @@
 #  include <lo/lo.h>
 #endif
 
-HttpServer::HttpServer(const std::string& assets_dir, int port)
-    : assets_dir_(assets_dir), port_(port) {}
+HttpServer::HttpServer(const std::string& assets_dir, int port, OscSender* osc)
+    : assets_dir_(assets_dir), port_(port), osc_(osc) {}
 
 void HttpServer::start() {
     running_ = true;
@@ -106,6 +107,35 @@ void HttpServer::start() {
         });
 
         svr.Options("/note", [](const httplib::Request&, httplib::Response& res) {
+            res.set_header("Access-Control-Allow-Origin",  "*");
+            res.set_header("Access-Control-Allow-Methods", "POST, OPTIONS");
+            res.set_header("Access-Control-Allow-Headers", "Content-Type");
+            res.status = 204;
+        });
+
+        // /mute POST — mute/unmute hand instruments
+        svr.Post("/mute", [this](const httplib::Request& req, httplib::Response& res) {
+#ifdef HAVE_LIBLO
+            try {
+                auto j = nlohmann::json::parse(req.body);
+                bool muted = j.value("muted", false);
+                if (osc_) {
+                    osc_->setPreviewMute(muted);
+                } else {
+                    lo_address sc = lo_address_new("127.0.0.1", "57120");
+                    lo_message m = lo_message_new();
+                    lo_message_add_int32(m, muted ? 1 : 0);
+                    lo_send_message(sc, "/mute", m);
+                    lo_message_free(m);
+                    lo_address_free(sc);
+                }
+            } catch (...) {}
+#endif
+            res.set_content("ok", "text/plain");
+            res.set_header("Access-Control-Allow-Origin", "*");
+        });
+
+        svr.Options("/mute", [](const httplib::Request&, httplib::Response& res) {
             res.set_header("Access-Control-Allow-Origin",  "*");
             res.set_header("Access-Control-Allow-Methods", "POST, OPTIONS");
             res.set_header("Access-Control-Allow-Headers", "Content-Type");
