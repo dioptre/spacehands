@@ -54,8 +54,10 @@ class AlsaAudioTrack(MediaStreamTrack):
         data = await asyncio.to_thread(self.proc.stdout.read, self.frame_bytes)
         if len(data) != self.frame_bytes:
             raise EOFError("short ALSA capture read")
-        pcm = np.frombuffer(data, dtype=np.int16).reshape(1, self.samples)
-        frame = AudioFrame.from_ndarray(pcm, format="s16", layout="mono")
+        # Build a mono s16 frame directly. This avoids PyAV ndarray shape
+        # ambiguity for packed-vs-planar mono audio and is more reliable in aiortc.
+        frame = AudioFrame(format="s16", layout="mono", samples=self.samples)
+        frame.planes[0].update(data)
         frame.sample_rate = self.sample_rate
         frame.pts = self.pts
         frame.time_base = Fraction(1, self.sample_rate)

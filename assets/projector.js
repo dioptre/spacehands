@@ -94,6 +94,7 @@
     let reconnectTimer = null;
     let watchdogTimer = null;
     let reconnectAttempts = 0;
+    let disconnectedSince = 0;
 
     const RECONNECT_BASE_MS = 500;
     const RECONNECT_MAX_MS = 4000;
@@ -253,9 +254,13 @@
         pc.onconnectionstatechange = () => {
             console.log('[webrtc] connection state', pc.connectionState);
             if (!audioLinkActive) return;
-            if (['failed', 'disconnected', 'closed'].includes(pc.connectionState)) {
+            if (['failed', 'closed'].includes(pc.connectionState)) {
                 scheduleReconnect(`connection ${pc.connectionState}`);
+            } else if (pc.connectionState === 'disconnected') {
+                disconnectedSince = disconnectedSince || Date.now();
+                setStatus('WebRTC briefly disconnected...');
             } else if (pc.connectionState === 'connected') {
+                disconnectedSince = 0;
                 reconnectAttempts = 0;
                 setStatus('WebRTC 2-way audio connected');
             }
@@ -264,12 +269,15 @@
         pc.oniceconnectionstatechange = () => {
             console.log('[webrtc] ice state', pc.iceConnectionState);
             if (!audioLinkActive) return;
-            if (['failed', 'disconnected', 'closed'].includes(pc.iceConnectionState)) {
+            if (['failed', 'closed'].includes(pc.iceConnectionState)) {
                 scheduleReconnect(`ice ${pc.iceConnectionState}`);
+            } else if (pc.iceConnectionState === 'disconnected') {
+                disconnectedSince = disconnectedSince || Date.now();
+                setStatus('WebRTC briefly disconnected...');
+            } else if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+                disconnectedSince = 0;
             }
         };
-
-        pc.addTransceiver('audio', { direction: 'sendrecv' });
 
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
@@ -306,8 +314,14 @@
         if (watchdogTimer) clearInterval(watchdogTimer);
         watchdogTimer = setInterval(() => {
             if (!audioLinkActive) return;
-            if (!pc || ['failed', 'disconnected', 'closed'].includes(pc.connectionState)) {
+            if (!pc || ['failed', 'closed'].includes(pc.connectionState)) {
                 scheduleReconnect('watchdog');
+            }
+            if (pc && pc.connectionState === 'disconnected') {
+                disconnectedSince = disconnectedSince || Date.now();
+                if (Date.now() - disconnectedSince > 6000) {
+                    scheduleReconnect('disconnected for 6s');
+                }
             }
             if (piAudio.paused && remoteStream && remoteStream.getAudioTracks().length > 0) {
                 piAudio.play().catch(() => scheduleReconnect('remote audio paused'));
@@ -324,6 +338,7 @@
         if (audioLinkActive) return;
         audioLinkActive = true;
         reconnectAttempts = 0;
+        disconnectedSince = 0;
         setAudioUi(true);
         setStatus('starting WebRTC audio...');
         try {
