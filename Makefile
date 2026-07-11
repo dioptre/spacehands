@@ -20,7 +20,7 @@ PI ?= auto
 BUILD ?= $(ROOT)/build
 CONFIG ?=
 
-.PHONY: all help detect deps check-deps build run pi projector instrument clean
+.PHONY: all help detect deps check-deps build run install-service uninstall service-status service-logs pi projector instrument clean
 
 help:
 	@echo "Spacehands Makefile"
@@ -30,8 +30,11 @@ help:
 	@echo "                                  Projector laptops auto-discover Pi by UDP broadcast"
 	@echo "  make PI=raspberrypi.local       Same, but with explicit Pi host"
 	@echo "  make run PI=raspberrypi.local   Same as make"
-	@echo "  make pi                         Run Raspberry Pi camera/audio bridge"
+	@echo "  make pi                         Run Raspberry Pi camera/audio bridge in foreground"
 	@echo "  make projector PI=<pi-host>     Run projector laptop page"
+	@echo "  make uninstall                  On Pi: remove boot service"
+	@echo "  make service-status             On Pi: show boot service status"
+	@echo "  make service-logs               On Pi: follow boot service logs"
 	@echo "  make instrument                 Run original local instrument app"
 	@echo ""
 	@echo "Setup/build:"
@@ -98,13 +101,13 @@ build: check-deps
 	cmake --build "$(BUILD)" -j"$$NCPU"
 
 # Auto role:
-#   Raspberry Pi: camera + raw stream + 2-way audio bridge
+#   Raspberry Pi: install/update/start boot service
 #   macOS or other Linux laptop: projector page connecting to PI=<host>
 run:
 	@set -euo pipefail; \
 	if [ "$(IS_RPI)" = "1" ]; then \
-	  echo "Auto-detected Raspberry Pi; running Pi role."; \
-	  $(MAKE) pi; \
+	  echo "Auto-detected Raspberry Pi; installing/updating boot service."; \
+	  $(MAKE) install-service; \
 	elif [ "$(OS)" = "Darwin" ] || [ "$(OS)" = "Linux" ]; then \
 	  echo "Auto-detected projector/laptop; running projector role."; \
 	  $(MAKE) projector PI="$(PI)"; \
@@ -112,10 +115,33 @@ run:
 	  echo "Unsupported OS: $(OS)"; exit 1; \
 	fi
 
-# Raspberry Pi role: camera stream, HTTP endpoints, Pi audio input/output bridge.
+# Raspberry Pi service role: install/update service, enable it for boot, and start now.
+install-service: build
+	@if [ "$(IS_RPI)" != "1" ]; then \
+	  echo "ERROR: install-service is only intended for Raspberry Pi."; \
+	  exit 1; \
+	fi
+	@CONFIG="$(if $(CONFIG),$(CONFIG),$(ROOT)/config.projector-pi.json)" \
+	  bash "$(ROOT)/scripts/install-pi-service.sh"
+
+# Raspberry Pi role: camera stream, HTTP endpoints, Pi audio input/output bridge in foreground.
 pi: build
 	@CONFIG="$(if $(CONFIG),$(CONFIG),$(ROOT)/config.projector-pi.json)" \
 	  bash "$(ROOT)/scripts/run-pi-camera-stream.sh"
+
+# Remove the Pi boot service. On non-Pi machines this is a no-op with a message.
+uninstall:
+	@if [ "$(IS_RPI)" = "1" ]; then \
+	  bash "$(ROOT)/scripts/uninstall-pi-service.sh"; \
+	else \
+	  echo "No Spacehands Pi service to uninstall on this machine."; \
+	fi
+
+service-status:
+	@systemctl status spacehands-pi.service
+
+service-logs:
+	@journalctl -u spacehands-pi.service -f
 
 # Projector laptop role: browser page that displays Pi camera and starts 2-way audio.
 projector: check-deps
