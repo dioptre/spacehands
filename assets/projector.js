@@ -8,6 +8,7 @@
     const listenBtn = document.getElementById('listen');
     const micSelect = document.getElementById('mic-select');
     const speakerSelect = document.getElementById('speaker-select');
+    const testSpeakerBtn = document.getElementById('test-speaker');
     const cropLeftInput = document.getElementById('crop-left');
     const cropRightInput = document.getElementById('crop-right');
     const flipImageBtn = document.getElementById('flip-image');
@@ -91,6 +92,9 @@
     let pc = null;
     let localStream = null;
     let remoteStream = null;
+    let audioCtx = null;
+    let remoteSource = null;
+    let remoteGain = null;
     let reconnectTimer = null;
     let watchdogTimer = null;
     let reconnectAttempts = 0;
@@ -118,6 +122,8 @@
     async function applySpeakerDevice() {
         const id = speakerSelect.value;
         localStorage.setItem('spacehandsSpeakerDeviceId', id || '');
+        // Chrome supports setSinkId on <audio>; Safari does not. If unsupported,
+        // choose the Bluetooth speaker as the macOS system output instead.
         if (typeof piAudio.setSinkId === 'function') {
             try {
                 await piAudio.setSinkId(id || '');
@@ -126,8 +132,29 @@
                 setStatus('speaker select failed: ' + (err.name || err.message));
             }
         } else if (id) {
-            setStatus('speaker selection unsupported in this browser');
+            setStatus('speaker selection unsupported; use Chrome or macOS Sound output');
         }
+    }
+
+    async function ensureAudioContext() {
+        audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+        if (audioCtx.state !== 'running') await audioCtx.resume();
+        return audioCtx;
+    }
+
+    async function testSelectedSpeaker() {
+        await applySpeakerDevice();
+        const ctx = await ensureAudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = 880;
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.38);
+        setStatus('speaker test beep');
     }
 
     async function populateAudioDevices() {
@@ -175,8 +202,13 @@
     });
     speakerSelect.addEventListener('change', async () => {
         await applySpeakerDevice();
-        if (audioLinkActive) piAudio.play().catch(() => {});
+        if (audioLinkActive) {
+            // Rebuild the remote audio element path after output-device change.
+            piAudio.play().catch(() => {});
+            await ensureAudioContext();
+        }
     });
+    testSpeakerBtn.addEventListener('click', testSelectedSpeaker);
     navigator.mediaDevices?.addEventListener?.('devicechange', populateAudioDevices);
     populateAudioDevices();
 
@@ -237,6 +269,7 @@
         piAudio.muted = false;
         piAudio.volume = 1.0;
         await applySpeakerDevice();
+        await ensureAudioContext();
 
         pc = new RTCPeerConnection({
             // LAN-only. No STUN/TURN needed; avoids depending on internet access.
@@ -246,9 +279,24 @@
 
         localStream.getAudioTracks().forEach(track => pc.addTrack(track, localStream));
 
-        pc.ontrack = (event) => {
+        pc.ontrack = async (event) => {
             event.streams[0]?.getTracks().forEach(track => remoteStream.addTrack(track));
-            piAudio.play().catch(err => console.warn('[webrtc] audio play failed', err));
+            try {
+                await ensureAudioContext();
+                // Route remote stream through Web Audio as well as the <audio> element.
+                // This helps Chrome/macOS Bluetooth sinks that sometimes fail to start
+                // a hidden media element but do play Web Audio reliably.
+                if (!remoteSource && remoteStream.getAudioTracks().length > 0) {
+                    remoteSource = audioCtx.createMediaStreamSource(remoteStream);
+                    remoteGain = audioCtx.createGain();
+                    remoteGain.gain.value = 1.0;
+                    remoteSource.connect(remoteGain).connect(audioCtx.destination);
+                }
+                await piAudio.play();
+            } catch (err) {
+                console.warn('[webrtc] remote audio start failed', err);
+                setStatus('remote audio failed: ' + (err.name || err.message));
+            }
         };
 
         pc.onconnectionstatechange = () => {
@@ -362,6 +410,14 @@
             try { pc.getSenders().forEach(s => { try { pc.removeTrack(s); } catch (_) {} }); } catch (_) {}
             try { pc.close(); } catch (_) {}
             pc = null;
+        }
+        if (remoteSource) {
+            try { remoteSource.disconnect(); } catch (_) {}
+            remoteSource = null;
+        }
+        if (remoteGain) {
+            try { remoteGain.disconnect(); } catch (_) {}
+            remoteGain = null;
         }
         if (remoteStream) {
             remoteStream.getTracks().forEach(t => t.stop());
