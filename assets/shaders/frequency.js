@@ -80,7 +80,10 @@
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
     let W=0,H=0;
-    function resize(){W=canvas.clientWidth;H=canvas.clientHeight;canvas.width=W;canvas.height=H;}
+    function resize(){
+        const scale = window.webglRenderScale || 1.0;
+        W=canvas.clientWidth*scale;H=canvas.clientHeight*scale;canvas.width=W;canvas.height=H;
+    }
     window.addEventListener('resize',resize); resize();
 
     function u(n){return gl.getUniformLocation(prog,n);}

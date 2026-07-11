@@ -132,10 +132,17 @@ int main(int argc, char* argv[]) {
         t_last     = now;
 
         // Vision — use colour frame for detection if available (Mac webcam)
-        auto detections = detector.detect(f->cam.confidence, f->cam.color);
+        cv::Mat confidence_input = f->cam.confidence;
+        if (f->cam.color.empty() && !f->cam.depth.empty()) {
+            // Mask out background: only keep pixels with depth in [50, 1000] mm
+            cv::Mat depth_mask = (f->cam.depth >= 50.0f) & (f->cam.depth <= 1000.0f);
+            confidence_input = f->cam.confidence.clone();
+            confidence_input.setTo(0, ~depth_mask);
+        }
+        auto detections = detector.detect(confidence_input, f->cam.color);
         auto hands      = classifier.classify(detections,
                                                f->cam.depth,
-                                               f->cam.confidence,
+                                               confidence_input,
                                                cam->width(),
                                                cam->height(),
                                                f->cam.color);

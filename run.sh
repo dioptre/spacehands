@@ -57,6 +57,10 @@ SC_PID=""
 CHROM_PID=""
 BIN_PID=""
 
+# Generate boot-instrument.ghci dynamically to resolve hardcoded home directory paths
+echo "Generating boot-instrument.ghci with local home path..."
+sed "s|/Users/andrewgrosser|$HOME|g" "$HOME/Documents/tidal/BootTidal.hs" > "$HOME/Documents/tidal/boot-instrument.ghci"
+
 if [ "$OS" = "Darwin" ]; then
     SCLANG="/Applications/SuperCollider.app/Contents/MacOS/sclang"
 
@@ -112,11 +116,31 @@ else
     CONFIG="$ROOT/config.pi.json"
     SCLANG=$(command -v sclang || echo "")
     if [ -n "$SCLANG" ]; then
+        # Initialize quarks/tidal-looper submodule if empty
+        if [ ! -f "$HOME/Documents/tidal/quarks/tidal-looper/TidalLooper.quark" ]; then
+            echo "  Initializing tidal-looper submodule..."
+            git -C "$HOME/Documents/tidal" submodule update --init --recursive quarks/tidal-looper >/dev/null 2>&1 || true
+        fi
+
+        # Check and install missing SuperCollider Quarks (SuperDirt, TidalLooper)
+        echo "  Checking SuperCollider Quarks..."
+        if ! echo 'if(\SuperDirt.asClass.notNil && { \TidalLooper.asClass.notNil }) { 0.exit } { 1.exit };' | "$SCLANG" >/dev/null 2>&1; then
+            echo "  Installing missing Quarks (SuperDirt, TidalLooper)..."
+            echo 'Quarks.install("SuperDirt"); Quarks.install("'"$HOME"'/Documents/tidal/quarks/tidal-looper"); 0.exit;' | "$SCLANG" >/dev/null 2>&1
+        fi
+
+        PWJACK=$(command -v pw-jack || echo "")
         echo "  Starting SuperCollider headless..."
-        "$SCLANG" ~/Documents/tidal/startup.scd > /tmp/sc_instrument.log 2>&1 &
+        if [ -n "$PWJACK" ]; then
+            pw-jack "$SCLANG" ~/Documents/tidal/startup.scd > /tmp/sc_instrument.log 2>&1 &
+        else
+            "$SCLANG" ~/Documents/tidal/startup.scd > /tmp/sc_instrument.log 2>&1 &
+        fi
         SC_PID=$!
         sleep 10
-        nohup ghci -ghci-script ~/Documents/tidal/boot-instrument.ghci \
+        
+        # Pipe tail -f /dev/null to GHCi to keep it alive in the background
+        nohup tail -f /dev/null | ghci -ghci-script ~/Documents/tidal/boot-instrument.ghci \
             > /tmp/tidal_instrument.log 2>&1 &
         sleep 6
     fi
@@ -128,10 +152,18 @@ else
     sleep 2
 
     export DISPLAY=:0
-    chromium-browser --kiosk --no-sandbox \
-        --disable-infobars --noerrdialogs \
-        --app="http://localhost:8080/?shader=${SHADER}" &
-    CHROM_PID=$!
+    BROWSER=$(command -v chromium-browser || command -v chromium || echo "")
+    if [ -n "$BROWSER" ]; then
+        "$BROWSER" --kiosk --no-sandbox \
+            --disable-infobars --noerrdialogs \
+            --ignore-gpu-blocklist \
+            --enable-gpu-rasterization \
+            --enable-zero-copy \
+            --app="http://127.0.0.1:8080/?shader=${SHADER}" &
+        CHROM_PID=$!
+    else
+        echo "WARNING: Chromium not found! Open a browser and visit: http://localhost:8080/?shader=${SHADER}"
+    fi
 fi
 
 echo ""

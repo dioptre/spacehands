@@ -198,7 +198,8 @@
 
     let W=0,H=0;
     function resize(){
-        W=canvas.clientWidth; H=canvas.clientHeight;
+        const scale = window.webglRenderScale || 1.0;
+        W=canvas.clientWidth*scale; H=canvas.clientHeight*scale;
         canvas.width=W; canvas.height=H;
     }
     window.addEventListener('resize',resize); resize();
@@ -210,7 +211,8 @@
     // We piggyback on the existing state mechanism by posting game events
     // to a dedicated endpoint that the C++ binary forwards as OSC
     function sendOrbEvent(orbId, held) {
-        fetch('http://localhost:8081/orb', {
+        const host = window.apiHost || 'localhost';
+        fetch(`http://${host}:8080/orb`, {
             method: 'POST',
             headers: {'Content-Type':'application/json'},
             body: JSON.stringify({ orb: orbId, held: held ? 1 : 0 })
