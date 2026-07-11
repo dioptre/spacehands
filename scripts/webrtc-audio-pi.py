@@ -110,19 +110,27 @@ class AlsaPlayer:
                 if not isinstance(frames, list):
                     frames = [frames]
                 for out in frames:
+                    if self.closed or self.proc.poll() is not None or not self.proc.stdin:
+                        return
                     data = out.to_ndarray().astype(np.int16, copy=False).tobytes()
-                    if self.proc.stdin:
+                    try:
                         await asyncio.to_thread(self.proc.stdin.write, data)
                         await asyncio.to_thread(self.proc.stdin.flush)
+                    except (BrokenPipeError, ValueError, OSError) as exc:
+                        # Happens during normal peer replacement/teardown when aplay's
+                        # stdin has already closed. Treat as graceful, not an error.
+                        print(f"[webrtc] Pi playback pipe closed: {exc}", flush=True)
+                        return
         except Exception as exc:
-            print(f"[webrtc] playback ended: {exc}", flush=True)
+            if not self.closed:
+                print(f"[webrtc] playback ended: {exc}", flush=True)
         finally:
             self.close()
 
     def close(self):
         self.closed = True
         try:
-            if self.proc.stdin:
+            if self.proc.stdin and not self.proc.stdin.closed:
                 self.proc.stdin.close()
         except Exception:
             pass
@@ -139,6 +147,15 @@ async def make_app(args):
     async def offer(request):
         params = await request.json()
         offer = RTCSessionDescription(sdp=params["sdp"], type=params["type"])
+
+        # Keep this sidecar single-client. If the browser reconnects, retire any
+        # old peer first so duplicate Pi mic tracks do not fight each other. Do the
+        # actual close asynchronously because aioice can still have packets in
+        # flight during offer handling.
+        old_pcs = list(pcs)
+        pcs.clear()
+        for old in old_pcs:
+            asyncio.create_task(old.close())
 
         pc = RTCPeerConnection()
         pcs.add(pc)
@@ -160,11 +177,12 @@ async def make_app(args):
         @pc.on("connectionstatechange")
         async def on_connectionstatechange():
             print(f"[webrtc] connection state: {pc.connectionState}", flush=True)
-            # Do not immediately close on "disconnected". Bluetooth output/device
-            # changes and brief Wi-Fi hiccups can cause transient disconnected states;
-            # closing here forces the browser into a noisy reconnect loop.
-            if pc.connectionState in ("failed", "closed"):
-                await close_pc(pc, mic_track, players, pcs)
+            # Do not close from inside the state callback. aiortc/aioice may still
+            # have STUN packets in flight, and closing here can trigger noisy
+            # NoneType.sendto races. The browser owns reconnects; this side just logs
+            # state and replaces old peers when a new offer arrives.
+            if pc.connectionState == "closed" and pc in pcs:
+                pcs.remove(pc)
 
         await pc.setRemoteDescription(offer)
         answer = await pc.createAnswer()
@@ -214,6 +232,18 @@ def main():
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
+
+    def handle_loop_exception(_loop, context):
+        exc = context.get("exception")
+        msg = context.get("message", "")
+        # aioice can log this during peer replacement if a datagram send races with
+        # transport close. It is harmless but confusing/noisy in performance logs.
+        if isinstance(exc, AttributeError) and "sendto" in str(exc):
+            print("[webrtc] ignored late ICE send after close", flush=True)
+            return
+        print(f"[webrtc] loop exception: {msg} {exc}", file=sys.stderr, flush=True)
+
+    loop.set_exception_handler(handle_loop_exception)
     app = loop.run_until_complete(make_app(args))
 
     print(f"[webrtc] listening on http://{args.host}:{args.port}", flush=True)
