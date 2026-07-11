@@ -6,6 +6,11 @@
     const connectBtn = document.getElementById('connect');
     const talkBtn = document.getElementById('talk');
     const listenBtn = document.getElementById('listen');
+    const micSelect = document.getElementById('mic-select');
+    const speakerSelect = document.getElementById('speaker-select');
+    const cropLeftInput = document.getElementById('crop-left');
+    const cropRightInput = document.getElementById('crop-right');
+    const flipImageBtn = document.getElementById('flip-image');
     const piAudio = document.getElementById('pi-audio');
     const status = document.getElementById('status');
 
@@ -17,6 +22,46 @@
     }
 
     function setStatus(text) { status.textContent = text; }
+
+    // --- UI auto-hide and projector crop ---
+    let hideTimer = null;
+    function showUiSoon() {
+        document.body.classList.remove('ui-hidden');
+        if (hideTimer) clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => document.body.classList.add('ui-hidden'), 3000);
+    }
+    ['mousemove', 'mousedown', 'touchstart', 'keydown', 'wheel'].forEach(ev => {
+        window.addEventListener(ev, showUiSoon, { passive: true });
+    });
+
+    function applyCrop() {
+        const left = Math.max(0, parseInt(cropLeftInput.value || '0', 10));
+        const right = Math.max(0, parseInt(cropRightInput.value || '0', 10));
+        document.documentElement.style.setProperty('--crop-left', left + 'px');
+        document.documentElement.style.setProperty('--crop-right', right + 'px');
+        localStorage.setItem('spacehandsCropLeft', String(left));
+        localStorage.setItem('spacehandsCropRight', String(right));
+    }
+    cropLeftInput.value = localStorage.getItem('spacehandsCropLeft') || '0';
+    cropRightInput.value = localStorage.getItem('spacehandsCropRight') || '0';
+    cropLeftInput.addEventListener('input', applyCrop);
+    cropRightInput.addEventListener('input', applyCrop);
+
+    let imageFlipped = localStorage.getItem('spacehandsFlipX') === '1';
+    function applyFlip() {
+        document.documentElement.style.setProperty('--flip-x', imageFlipped ? '-1' : '1');
+        flipImageBtn.textContent = 'flip: ' + (imageFlipped ? 'on' : 'off');
+        flipImageBtn.classList.toggle('active', imageFlipped);
+        localStorage.setItem('spacehandsFlipX', imageFlipped ? '1' : '0');
+    }
+    flipImageBtn.addEventListener('click', () => {
+        imageFlipped = !imageFlipped;
+        applyFlip();
+    });
+
+    applyCrop();
+    applyFlip();
+    showUiSoon();
 
     function connectCamera() {
         const host = cleanHost(hostInput.value);
@@ -64,6 +109,76 @@
         return `http://${cleanHost(hostInput.value)}:8091${path}`;
     }
 
+    function selectedMicConstraint() {
+        const id = micSelect.value;
+        return id ? { exact: id } : undefined;
+    }
+
+    async function applySpeakerDevice() {
+        const id = speakerSelect.value;
+        localStorage.setItem('spacehandsSpeakerDeviceId', id || '');
+        if (typeof piAudio.setSinkId === 'function') {
+            try {
+                await piAudio.setSinkId(id || '');
+            } catch (err) {
+                console.warn('[audio] setSinkId failed', err);
+                setStatus('speaker select failed: ' + (err.name || err.message));
+            }
+        } else if (id) {
+            setStatus('speaker selection unsupported in this browser');
+        }
+    }
+
+    async function populateAudioDevices() {
+        if (!navigator.mediaDevices?.enumerateDevices) return;
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const savedMic = localStorage.getItem('spacehandsMicDeviceId') || '';
+            const savedSpeaker = localStorage.getItem('spacehandsSpeakerDeviceId') || '';
+            const curMic = micSelect.value || savedMic;
+            const curSpeaker = speakerSelect.value || savedSpeaker;
+
+            micSelect.innerHTML = '<option value="">default</option>';
+            speakerSelect.innerHTML = '<option value="">default</option>';
+            let micCount = 0, speakerCount = 0;
+            devices.forEach(d => {
+                if (d.kind === 'audioinput') {
+                    micCount++;
+                    const opt = document.createElement('option');
+                    opt.value = d.deviceId;
+                    opt.textContent = d.label || `microphone ${micCount}`;
+                    micSelect.appendChild(opt);
+                } else if (d.kind === 'audiooutput') {
+                    speakerCount++;
+                    const opt = document.createElement('option');
+                    opt.value = d.deviceId;
+                    opt.textContent = d.label || `speaker ${speakerCount}`;
+                    speakerSelect.appendChild(opt);
+                }
+            });
+            micSelect.value = Array.from(micSelect.options).some(o => o.value === curMic) ? curMic : '';
+            speakerSelect.value = Array.from(speakerSelect.options).some(o => o.value === curSpeaker) ? curSpeaker : '';
+            await applySpeakerDevice();
+        } catch (err) {
+            console.warn('[audio] enumerateDevices failed', err);
+        }
+    }
+
+    micSelect.addEventListener('change', async () => {
+        localStorage.setItem('spacehandsMicDeviceId', micSelect.value || '');
+        if (localStream) {
+            localStream.getTracks().forEach(t => t.stop());
+            localStream = null;
+        }
+        if (audioLinkActive) scheduleReconnect('microphone changed');
+    });
+    speakerSelect.addEventListener('change', async () => {
+        await applySpeakerDevice();
+        if (audioLinkActive) piAudio.play().catch(() => {});
+    });
+    navigator.mediaDevices?.addEventListener?.('devicechange', populateAudioDevices);
+    populateAudioDevices();
+
     function waitForIceGatheringComplete(peer) {
         if (peer.iceGatheringState === 'complete') return Promise.resolve();
         return new Promise(resolve => {
@@ -103,6 +218,7 @@
 
         localStream = localStream || await navigator.mediaDevices.getUserMedia({
             audio: {
+                deviceId: selectedMicConstraint(),
                 echoCancellation: true,
                 noiseSuppression: true,
                 autoGainControl: true,
@@ -111,6 +227,7 @@
             },
             video: false,
         });
+        await populateAudioDevices();
 
         remoteStream = new MediaStream();
         piAudio.srcObject = remoteStream;
@@ -118,6 +235,7 @@
         piAudio.playsInline = true;
         piAudio.muted = false;
         piAudio.volume = 1.0;
+        await applySpeakerDevice();
 
         pc = new RTCPeerConnection({
             // LAN-only. No STUN/TURN needed; avoids depending on internet access.
