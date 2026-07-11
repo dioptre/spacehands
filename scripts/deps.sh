@@ -34,6 +34,8 @@ elif [ "$OS" = "Linux" ]; then
         cmake \
         pkg-config \
         python3 \
+        python3-venv \
+        python3-pip \
         git \
         libopencv-dev \
         liblo-dev \

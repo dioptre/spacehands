@@ -38,175 +38,163 @@
     img.addEventListener('error', () => setStatus('camera reconnecting...'));
     img.addEventListener('load', () => setStatus(`camera ← ${cleanHost(hostInput.value)}:8082`));
 
-    // More resilient low-latency two-way audio:
-    //   projector mic → Pi earphones: short Opus/WebM chunks over HTTP POST.
-    //   Pi mic        → projector: browser audio element connected to /pi-mic.
-    // This is still not true WebRTC latency, but smaller chunks + reconnects make it
-    // much closer to real-time and prevent one broken ffmpeg pipe from killing audio.
-    let micStream = null;
-    let recorder = null;
-    let projectorMicActive = false;
-    let piMicActive = false;
+    // WebRTC two-way audio:
+    //   projector mic → Pi earphones
+    //   Pi mic        → projector speaker
+    // Signaling goes to the Pi sidecar on :8091. Media goes peer-to-peer over WebRTC.
     let audioLinkActive = false;
-    let piMicReconnectTimer = null;
-    let projectorMicRestartTimer = null;
-    let chunkQueue = Promise.resolve();
-    let lastChunkOkAt = 0;
+    let pc = null;
+    let localStream = null;
+    let remoteStream = null;
+    let reconnectTimer = null;
     let watchdogTimer = null;
+    let reconnectAttempts = 0;
 
-    const CHUNK_MS = 40;
-    const RECONNECT_MS = 700;
-    const STALE_MS = 3500;
+    const RECONNECT_BASE_MS = 500;
+    const RECONNECT_MAX_MS = 4000;
 
-    function talkUrl(path) {
-        return `http://${cleanHost(hostInput.value)}:8080/talk/${path}`;
+    function setAudioUi(active) {
+        talkBtn.classList.toggle('active', active);
+        listenBtn.classList.toggle('active', active);
+        talkBtn.textContent = active ? 'WebRTC audio running' : 'start 2-way audio';
+        listenBtn.textContent = active ? 'stop audio' : 'audio stopped';
     }
 
-    async function postTalk(path, body, contentType) {
+    function webrtcUrl(path) {
+        return `http://${cleanHost(hostInput.value)}:8091${path}`;
+    }
+
+    function waitForIceGatheringComplete(peer) {
+        if (peer.iceGatheringState === 'complete') return Promise.resolve();
+        return new Promise(resolve => {
+            const timeout = setTimeout(resolve, 2500);
+            function check() {
+                if (peer.iceGatheringState === 'complete') {
+                    clearTimeout(timeout);
+                    peer.removeEventListener('icegatheringstatechange', check);
+                    resolve();
+                }
+            }
+            peer.addEventListener('icegatheringstatechange', check);
+        });
+    }
+
+    async function postOffer(offer) {
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 1200);
+        const timer = setTimeout(() => controller.abort(), 5000);
         try {
-            const opts = { method: 'POST', mode: 'cors', cache: 'no-store', signal: controller.signal };
-            if (body) opts.body = body;
-            if (contentType) opts.headers = { 'Content-Type': contentType };
-            const res = await fetch(talkUrl(path), opts);
-            if (!res.ok) throw new Error(`${path} HTTP ${res.status}`);
-            return res;
+            const res = await fetch(webrtcUrl('/offer'), {
+                method: 'POST',
+                mode: 'cors',
+                cache: 'no-store',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(offer),
+                signal: controller.signal,
+            });
+            if (!res.ok) throw new Error(`offer HTTP ${res.status}`);
+            return await res.json();
         } finally {
             clearTimeout(timer);
         }
     }
 
-    function setAudioUi(active) {
-        talkBtn.classList.toggle('active', active);
-        listenBtn.classList.toggle('active', active);
-        talkBtn.textContent = active ? '2-way audio running' : 'start 2-way audio';
-        listenBtn.textContent = active ? 'stop audio' : 'audio stopped';
-    }
+    async function startWebrtcAudio() {
+        if (pc) await stopWebrtcAudio(false);
 
-    function clearProjectorMicRestart() {
-        if (projectorMicRestartTimer) clearTimeout(projectorMicRestartTimer);
-        projectorMicRestartTimer = null;
-    }
-
-    function scheduleProjectorMicRestart(reason) {
-        if (!audioLinkActive) return;
-        console.warn('[talk] restarting projector→Pi audio:', reason);
-        setStatus('projector mic reconnecting...');
-        clearProjectorMicRestart();
-        projectorMicRestartTimer = setTimeout(async () => {
-            try {
-                await stopProjectorMicToPi(false);
-                await startProjectorMicToPi();
-                setStatus('constant 2-way audio running');
-            } catch (err) {
-                console.warn('[talk] restart failed', err);
-                scheduleProjectorMicRestart(err.message || err.name || 'restart failed');
-            }
-        }, RECONNECT_MS);
-    }
-
-    async function startProjectorMicToPi() {
-        if (projectorMicActive) return;
-        if (!window.MediaRecorder) throw new Error('MediaRecorder unavailable in this browser');
-        micStream = micStream || await navigator.mediaDevices.getUserMedia({
+        localStream = localStream || await navigator.mediaDevices.getUserMedia({
             audio: {
                 echoCancellation: true,
                 noiseSuppression: true,
                 autoGainControl: true,
                 channelCount: 1,
-                sampleRate: 48000
+                sampleRate: 48000,
             },
-            video: false
+            video: false,
         });
-        await postTalk('start');
 
-        const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-            ? 'audio/webm;codecs=opus'
-            : 'audio/webm';
-        recorder = new MediaRecorder(micStream, { mimeType: mime, audioBitsPerSecond: 32000 });
-        recorder.ondataavailable = (e) => {
-            if (!projectorMicActive || !e.data || e.data.size === 0) return;
-            // Serialize posts so chunks arrive in order. If one fails, restart the
-            // Pi receiver and recorder instead of silently losing audio forever.
-            chunkQueue = chunkQueue.then(async () => {
-                if (!projectorMicActive) return;
-                try {
-                    await postTalk('chunk', e.data, mime);
-                    lastChunkOkAt = Date.now();
-                } catch (err) {
-                    scheduleProjectorMicRestart(err.message || err.name || 'chunk failed');
-                }
-            });
-        };
-        recorder.onerror = (e) => scheduleProjectorMicRestart(e.error?.message || 'recorder error');
-        recorder.onstop = () => {
-            if (audioLinkActive && projectorMicActive) scheduleProjectorMicRestart('recorder stopped');
-        };
-        projectorMicActive = true;
-        lastChunkOkAt = Date.now();
-        chunkQueue = Promise.resolve();
-        recorder.start(CHUNK_MS);
-    }
-
-    async function stopProjectorMicToPi(sendStop = true) {
-        clearProjectorMicRestart();
-        const wasActive = projectorMicActive;
-        projectorMicActive = false;
-        try {
-            if (recorder && recorder.state !== 'inactive') recorder.stop();
-        } catch (_) {}
-        recorder = null;
-        if (sendStop && wasActive) {
-            try { await postTalk('stop'); } catch (_) {}
-        }
-    }
-
-    async function startPiMicToProjector() {
-        if (piMicActive) return;
-        const host = cleanHost(hostInput.value);
-        piAudio.src = `http://${host}:8080/pi-mic?t=${Date.now()}`;
+        remoteStream = new MediaStream();
+        piAudio.srcObject = remoteStream;
+        piAudio.autoplay = true;
+        piAudio.playsInline = true;
         piAudio.muted = false;
         piAudio.volume = 1.0;
-        piAudio.preload = 'none';
+
+        pc = new RTCPeerConnection({
+            // LAN-only. No STUN/TURN needed; avoids depending on internet access.
+            iceServers: [],
+            bundlePolicy: 'max-bundle',
+        });
+
+        localStream.getAudioTracks().forEach(track => pc.addTrack(track, localStream));
+
+        pc.ontrack = (event) => {
+            event.streams[0]?.getTracks().forEach(track => remoteStream.addTrack(track));
+            piAudio.play().catch(err => console.warn('[webrtc] audio play failed', err));
+        };
+
+        pc.onconnectionstatechange = () => {
+            console.log('[webrtc] connection state', pc.connectionState);
+            if (!audioLinkActive) return;
+            if (['failed', 'disconnected', 'closed'].includes(pc.connectionState)) {
+                scheduleReconnect(`connection ${pc.connectionState}`);
+            } else if (pc.connectionState === 'connected') {
+                reconnectAttempts = 0;
+                setStatus('WebRTC 2-way audio connected');
+            }
+        };
+
+        pc.oniceconnectionstatechange = () => {
+            console.log('[webrtc] ice state', pc.iceConnectionState);
+            if (!audioLinkActive) return;
+            if (['failed', 'disconnected', 'closed'].includes(pc.iceConnectionState)) {
+                scheduleReconnect(`ice ${pc.iceConnectionState}`);
+            }
+        };
+
+        pc.addTransceiver('audio', { direction: 'sendrecv' });
+
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        await waitForIceGatheringComplete(pc);
+
+        const answer = await postOffer({
+            sdp: pc.localDescription.sdp,
+            type: pc.localDescription.type,
+        });
+        await pc.setRemoteDescription(answer);
         await piAudio.play();
-        piMicActive = true;
     }
 
-    function stopPiMicToProjector() {
-        piMicActive = false;
-        if (piMicReconnectTimer) clearTimeout(piMicReconnectTimer);
-        piMicReconnectTimer = null;
-        piAudio.pause();
-        piAudio.removeAttribute('src');
-        piAudio.load();
-    }
-
-    function schedulePiMicReconnect(reason) {
+    function scheduleReconnect(reason) {
         if (!audioLinkActive) return;
-        console.warn('[listen] reconnecting Pi mic:', reason);
-        setStatus('Pi mic reconnecting...');
-        piMicActive = false;
-        if (piMicReconnectTimer) clearTimeout(piMicReconnectTimer);
-        piMicReconnectTimer = setTimeout(() => {
-            stopPiMicToProjector();
-            startPiMicToProjector()
-                .then(() => setStatus('constant 2-way audio running'))
-                .catch(err => schedulePiMicReconnect(err.message || err.name || 'play failed'));
-        }, RECONNECT_MS);
+        if (reconnectTimer) return;
+        reconnectAttempts += 1;
+        const delay = Math.min(RECONNECT_MAX_MS, RECONNECT_BASE_MS * reconnectAttempts);
+        console.warn('[webrtc] reconnecting:', reason, `in ${delay}ms`);
+        setStatus(`WebRTC reconnecting (${reason})...`);
+        reconnectTimer = setTimeout(async () => {
+            reconnectTimer = null;
+            if (!audioLinkActive) return;
+            try {
+                await startWebrtcAudio();
+            } catch (err) {
+                console.warn('[webrtc] reconnect failed', err);
+                scheduleReconnect(err.message || err.name || 'reconnect failed');
+            }
+        }, delay);
     }
 
     function startWatchdog() {
         if (watchdogTimer) clearInterval(watchdogTimer);
         watchdogTimer = setInterval(() => {
             if (!audioLinkActive) return;
-            if (projectorMicActive && Date.now() - lastChunkOkAt > STALE_MS) {
-                scheduleProjectorMicRestart('no successful chunks recently');
+            if (!pc || ['failed', 'disconnected', 'closed'].includes(pc.connectionState)) {
+                scheduleReconnect('watchdog');
             }
-            if (piMicActive && piAudio.paused) {
-                schedulePiMicReconnect('audio element paused');
+            if (piAudio.paused && remoteStream && remoteStream.getAudioTracks().length > 0) {
+                piAudio.play().catch(() => scheduleReconnect('remote audio paused'));
             }
-        }, 1000);
+        }, 1500);
     }
 
     function stopWatchdog() {
@@ -217,24 +205,47 @@
     async function startAudioLink() {
         if (audioLinkActive) return;
         audioLinkActive = true;
+        reconnectAttempts = 0;
         setAudioUi(true);
+        setStatus('starting WebRTC audio...');
         try {
-            await startProjectorMicToPi();
-            await startPiMicToProjector();
+            await startWebrtcAudio();
             startWatchdog();
-            setStatus('constant 2-way audio running');
+            setStatus('WebRTC 2-way audio connected');
         } catch (err) {
             console.error(err);
-            setStatus('2-way audio failed: ' + (err.name || err.message));
-            await stopAudioLink();
+            setStatus('WebRTC audio failed: ' + (err.name || err.message));
+            scheduleReconnect(err.message || err.name || 'initial connect failed');
+        }
+    }
+
+    async function stopWebrtcAudio(stopTracks) {
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+        if (pc) {
+            pc.ontrack = null;
+            pc.onconnectionstatechange = null;
+            pc.oniceconnectionstatechange = null;
+            try { pc.getSenders().forEach(s => { try { pc.removeTrack(s); } catch (_) {} }); } catch (_) {}
+            try { pc.close(); } catch (_) {}
+            pc = null;
+        }
+        if (remoteStream) {
+            remoteStream.getTracks().forEach(t => t.stop());
+            remoteStream = null;
+        }
+        piAudio.pause();
+        piAudio.srcObject = null;
+        if (stopTracks && localStream) {
+            localStream.getTracks().forEach(t => t.stop());
+            localStream = null;
         }
     }
 
     async function stopAudioLink() {
         audioLinkActive = false;
         stopWatchdog();
-        await stopProjectorMicToPi(true);
-        stopPiMicToProjector();
+        await stopWebrtcAudio(true);
         setAudioUi(false);
         setStatus(`camera ← ${cleanHost(hostInput.value)}:8082`);
     }
@@ -246,15 +257,6 @@
             e.preventDefault();
             audioLinkActive ? stopAudioLink() : startAudioLink();
         }
-    });
-    piAudio.addEventListener('error', () => schedulePiMicReconnect('audio element error'));
-    piAudio.addEventListener('ended', () => schedulePiMicReconnect('audio stream ended'));
-    piAudio.addEventListener('stalled', () => schedulePiMicReconnect('audio stream stalled'));
-    piAudio.addEventListener('waiting', () => {
-        if (audioLinkActive) setStatus('Pi mic buffering...');
-    });
-    piAudio.addEventListener('playing', () => {
-        if (audioLinkActive) setStatus('constant 2-way audio running');
     });
 
     setAudioUi(false);
