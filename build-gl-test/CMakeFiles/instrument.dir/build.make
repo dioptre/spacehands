@@ -302,10 +302,12 @@ instrument: CMakeFiles/instrument.dir/src/renderer/Renderer.cpp.o
 instrument: CMakeFiles/instrument.dir/build.make
 instrument: /opt/homebrew/lib/libopencv_videoio.4.13.0.dylib
 instrument: /opt/homebrew/lib/libopencv_dnn.4.13.0.dylib
+instrument: /opt/homebrew/lib/libGLEW.2.3.1.dylib
 instrument: /opt/homebrew/lib/liblo.dylib
 instrument: /opt/homebrew/lib/libopencv_imgcodecs.4.13.0.dylib
 instrument: /opt/homebrew/lib/libopencv_imgproc.4.13.0.dylib
 instrument: /opt/homebrew/lib/libopencv_core.4.13.0.dylib
+instrument: /opt/homebrew/Cellar/glfw/3.4/lib/libglfw.dylib
 instrument: CMakeFiles/instrument.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/andrewgrosser/Documents/spacehands/build-gl-test/CMakeFiles --progress-num=$(CMAKE_PROGRESS_15) "Linking CXX executable instrument"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/instrument.dir/link.txt --verbose=$(VERBOSE)

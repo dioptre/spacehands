@@ -4,9 +4,9 @@
 # compile CXX with /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/c++
 CXX_DEFINES = -DHAVE_LIBLO -DPLATFORM_MAC -DUSE_MOCK_CAMERA
 
-CXX_INCLUDES = -I/Users/andrewgrosser/Documents/spacehands/src -I/Users/andrewgrosser/Documents/spacehands/third_party -I/Users/andrewgrosser/Documents/spacehands/third_party/uWebSockets/src -I/Users/andrewgrosser/Documents/spacehands/third_party/uSockets/src -I/opt/homebrew/Cellar/glfw/3.4/include -I/opt/homebrew/include -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks -I/Users/andrewgrosser/Documents/spacehands/third_party/uSockets -isystem /opt/homebrew/Cellar/opencv/4.13.0_12/include/opencv4
+CXX_INCLUDES = -I/Users/andrewgrosser/Documents/spacehands/src -I/Users/andrewgrosser/Documents/spacehands/third_party -I/Users/andrewgrosser/Documents/spacehands/third_party/uWebSockets/src -I/Users/andrewgrosser/Documents/spacehands/third_party/uSockets/src -F/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk/System/Library/Frameworks -I/Users/andrewgrosser/Documents/spacehands/third_party/uSockets -isystem /opt/homebrew/Cellar/opencv/4.13.0_12/include/opencv4 -isystem /opt/homebrew/Cellar/glfw/3.4/include -isystem /opt/homebrew/include
 
-CXX_FLAGSarm64 = -O3 -DNDEBUG -std=gnu++17 -arch arm64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk -mmacosx-version-min=15.7
+CXX_FLAGSarm64 = -O3 -DNDEBUG -std=gnu++17 -arch arm64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk -mmacosx-version-min=15.7 -F/Library/Developer/CommandLineTools/SDKs/MacOSX15.sdk/System/Library/Frameworks 
 
-CXX_FLAGS = -O3 -DNDEBUG -std=gnu++17 -arch arm64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk -mmacosx-version-min=15.7
+CXX_FLAGS = -O3 -DNDEBUG -std=gnu++17 -arch arm64 -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.2.sdk -mmacosx-version-min=15.7 -F/Library/Developer/CommandLineTools/SDKs/MacOSX15.sdk/System/Library/Frameworks 
 

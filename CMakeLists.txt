@@ -42,7 +42,7 @@ target_include_directories(uSockets INTERFACE
 
 # GLFW3, GLEW & OpenGL
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(GLFW REQUIRED glfw3)
+pkg_check_modules(GLFW REQUIRED IMPORTED_TARGET glfw3)
 find_package(GLEW REQUIRED)
 find_package(OpenGL REQUIRED)
 if(TARGET GLEW::GLEW)
@@ -90,7 +90,7 @@ target_link_libraries(instrument PRIVATE
     ${OpenCV_LIBS}
     Threads::Threads
     uSockets
-    ${GLFW_LIBRARIES}
+    PkgConfig::GLFW
     ${GLEW_LINK_LIBS}
     ${OPENGL_LIBRARIES}
 )

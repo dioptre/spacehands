@@ -96,7 +96,16 @@ check-deps:
 
 build: check-deps
 	@set -euo pipefail; \
-	NCPU=$$( [ "$(OS)" = "Darwin" ] && sysctl -n hw.ncpu || nproc ); \
+	if [ -n "${BUILD_JOBS:-}" ]; then \
+	  NCPU="${BUILD_JOBS}"; \
+	elif [ "$(IS_RPI)" = "1" ]; then \
+	  NCPU=1; \
+	elif [ "$(OS)" = "Darwin" ]; then \
+	  NCPU=$$(sysctl -n hw.ncpu); \
+	else \
+	  NCPU=$$(nproc); \
+	fi; \
+	echo "Building with -j$$NCPU"; \
 	cmake -S "$(ROOT)" -B "$(BUILD)" -DCMAKE_BUILD_TYPE=Release; \
 	cmake --build "$(BUILD)" -j"$$NCPU"
 

@@ -7,6 +7,7 @@
 #include <mutex>
 #include <array>
 #include <memory>
+#include <csignal>
 #if __has_include(<nlohmann/json.hpp>)
 #  include <nlohmann/json.hpp>
 #else
@@ -31,11 +32,16 @@ public:
         else        std::cout << "[TalkReceiver] listening: projector mic → Pi audio out\n";
     }
 
-    void chunk(const std::string& bytes) {
+    bool chunk(const std::string& bytes) {
         std::lock_guard<std::mutex> lk(mutex_);
-        if (!pipe_ || bytes.empty()) return;
-        fwrite(bytes.data(), 1, bytes.size(), pipe_);
-        fflush(pipe_);
+        if (!pipe_ || bytes.empty()) return false;
+        size_t written = fwrite(bytes.data(), 1, bytes.size(), pipe_);
+        if (written != bytes.size() || fflush(pipe_) == EOF || ferror(pipe_)) {
+            std::cerr << "[TalkReceiver] ffmpeg audio pipe broke; stopping receiver\n";
+            stopLocked();
+            return false;
+        }
+        return true;
     }
 
     void stop() {
@@ -81,7 +87,13 @@ HttpServer::HttpServer(const std::string& assets_dir, int port, OscSender* osc)
 void HttpServer::start() {
     running_ = true;
     thread_ = std::thread([this]() {
+        // If ffmpeg/ffplay exits while we write to its pipe, do not let SIGPIPE
+        // terminate the whole instrument process. Report failure to the browser so
+        // it can reconnect instead.
+        std::signal(SIGPIPE, SIG_IGN);
+
         httplib::Server svr;
+        svr.new_task_queue = [] { return new httplib::ThreadPool(12); };
         svr.set_mount_point("/", assets_dir_.c_str());
 
         // /talk/* — projector browser microphone → Pi default audio output.
@@ -92,8 +104,12 @@ void HttpServer::start() {
             res.set_header("Access-Control-Allow-Origin", "*");
         });
         svr.Post("/talk/chunk", [](const httplib::Request& req, httplib::Response& res) {
-            g_talk.chunk(req.body);
-            res.set_content("ok", "text/plain");
+            if (g_talk.chunk(req.body)) {
+                res.set_content("ok", "text/plain");
+            } else {
+                res.status = 503;
+                res.set_content("audio receiver unavailable", "text/plain");
+            }
             res.set_header("Access-Control-Allow-Origin", "*");
         });
         svr.Post("/talk/stop", [](const httplib::Request&, httplib::Response& res) {

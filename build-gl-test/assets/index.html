@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wormhole Instrument</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { width:100%; height:100%; background:#000; overflow:hidden; }
+  canvas { display:block; width:100vw; height:100vh; }
+  #debug {
+    position:fixed; top:8px; left:8px;
+    color:rgba(255,255,255,0.35); font:11px monospace;
+    pointer-events:none; white-space:pre;
+  }
+  #shader-switcher {
+    position:fixed; bottom:12px; right:12px;
+    display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;
+  }
+  #shader-switcher button {
+    background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2);
+    color:rgba(255,255,255,0.6); font:11px monospace; padding:4px 10px;
+    cursor:pointer; border-radius:3px;
+  }
+  #shader-switcher button:hover { background:rgba(255,255,255,0.2); }
+  #shader-switcher button.active { border-color:rgba(255,255,255,0.7); color:#fff; }
+  #crop-ui {
+    position:fixed; bottom:12px; left:12px;
+    display:flex; gap:10px; align-items:center;
+    color:rgba(255,255,255,0.5); font:11px monospace;
+  }
+  #crop-ui label { display:flex; align-items:center; gap:4px; }
+  #crop-ui input {
+    width:50px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2);
+    color:#fff; font:11px monospace; padding:3px 6px; border-radius:3px; text-align:center;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="debug"></div>
+
+<!-- Shader switcher -->
+<div id="shader-switcher">
+  <button data-shader="wormhole">wormhole</button>
+  <button data-shader="voronoi">voronoi</button>
+  <button data-shader="frequency">frequency</button>
+  <button data-shader="hand">hand</button>
+  <button data-shader="offering">offering</button>
+  <button data-shader="transformation">transformation</button>
+  <button id="mirror-btn" onclick="event.stopPropagation()" style="border-color:rgba(255,255,0,0.4);color:rgba(255,255,0,0.7)">mirror: off</button>
+</div>
+
+<!-- Projector crop UI — persisted in localStorage -->
+<div id="crop-ui">
+  <label>L crop: <input type="number" id="crop-left"  value="0" min="0" max="400"></label>
+  <label>R crop: <input type="number" id="crop-right" value="0" min="0" max="400"></label>
+  <button id="toggle-labels" onclick="event.stopPropagation()" style="background:rgba(0,0,0,0.8);border:1px solid rgba(255,255,255,0.6);color:#fff;padding:4px 10px;font:11px monospace;cursor:pointer;border-radius:3px;">labels: off</button>
+  <button id="toggle-hints"  onclick="event.stopPropagation()" style="background:rgba(0,0,0,0.8);border:1px solid rgba(255,255,255,0.6);color:#fff;padding:4px 10px;font:11px monospace;cursor:pointer;border-radius:3px;">hints: off</button>
+  <button id="toggle-pulse" onclick="event.stopPropagation()" style="background:rgba(0,0,0,0.8);border:1px solid rgba(255,255,255,0.6);color:#fff;padding:4px 10px;font:11px monospace;cursor:pointer;border-radius:3px;">pulse: off</button>
+  <button id="trigger-ending" onclick="event.stopPropagation(); if(window.triggerEnding) window.triggerEnding();" style="background:rgba(80,0,0,0.9);border:1px solid rgba(255,80,80,0.8);color:#ff8888;padding:4px 10px;font:11px monospace;cursor:pointer;border-radius:3px;">▶ ending</button>
+</div>
+
+<script>
+window.showPulse = false;
+window.showLabels = false;
+window.showHints = false;
+const isPi = navigator.userAgent.toLowerCase().includes('linux') || navigator.platform.toLowerCase().includes('linux');
+window.webglRenderScale = isPi ? 0.6 : 1.0;
+window.apiHost = isPi ? '127.0.0.1' : 'localhost';
+</script>
+<script src="ws_client.js"></script>
+<script>
+(function () {
+    // ---- Projector crop ----
+    const cropL = document.getElementById('crop-left');
+    const cropR = document.getElementById('crop-right');
+    const canvas = document.getElementById('c');
+
+    function applyCrop() {
+        const l = parseInt(cropL.value) || 0;
+        const r = parseInt(cropR.value) || 0;
+        canvas.style.marginLeft  = l + 'px';
+        canvas.style.marginRight = r + 'px';
+        canvas.style.width = 'calc(100vw - ' + (l+r) + 'px)';
+        localStorage.setItem('cropL', l);
+        localStorage.setItem('cropR', r);
+    }
+    // Restore from localStorage
+    cropL.value = localStorage.getItem('cropL') || '0';
+    cropR.value = localStorage.getItem('cropR') || '0';
+    applyCrop();
+    cropL.addEventListener('input', applyCrop);
+    cropR.addEventListener('input', applyCrop);
+
+    // ---- Shader switcher ----
+    const SHADERS = ['wormhole', 'voronoi', 'frequency', 'hand', 'offering', 'transformation'];
+    const params  = new URLSearchParams(window.location.search);
+    let current   = params.get('shader') || 'wormhole';
+    if (!SHADERS.includes(current)) current = 'wormhole';
+
+    let scriptEl = null;
+
+    function loadShader(name) {
+        current = name;
+        document.querySelectorAll('#shader-switcher button').forEach(b => {
+            b.classList.toggle('active', b.dataset.shader === name);
+        });
+        if (window.startMjpeg) window.startMjpeg(name === 'frequency');
+        const url = new URL(window.location);
+        url.searchParams.set('shader', name);
+        window.history.replaceState({}, '', url);
+        if (scriptEl) scriptEl.remove();
+        const old = document.getElementById('c');
+        const fresh = old.cloneNode(false);
+        // Re-apply crop styles to fresh canvas
+        fresh.style.marginLeft  = old.style.marginLeft;
+        fresh.style.marginRight = old.style.marginRight;
+        fresh.style.width       = old.style.width;
+        old.parentNode.replaceChild(fresh, old);
+        fresh.id = 'c';
+        scriptEl = document.createElement('script');
+        scriptEl.src = 'shaders/' + name + '.js?t=' + Date.now();
+        document.body.appendChild(scriptEl);
+    }
+
+    document.querySelectorAll('#shader-switcher button[data-shader]').forEach(b => {
+        b.addEventListener('click', () => loadShader(b.dataset.shader));
+    });
+
+    loadShader(current);
+})();
+</script>
+</body>
+</html>
