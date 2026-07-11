@@ -137,14 +137,52 @@ void OscSender::sendSpatial(float x, float y) {
 }
 void OscSender::sendLevel(int level) { sendMsgI(addr_, "/level", level); }
 void OscSender::sendMute(bool muted) { sendMsgI(addr_, "/mute", muted ? 1 : 0); }
+void OscSender::setPreviewMute(bool muted) {
+    preview_muted_ = muted;
+    sendMute(preview_muted_ || prev_.muted);
+}
+void OscSender::setElapsedTime(float t) { elapsed_time_ = t; }
+void OscSender::setTargetNode(int idx) { target_node_idx_ = idx; }
 
 void OscSender::send(const HandList& hands, const MusicParams& p, const GameStateData& state, bool scInstruments) {
     if (!addr_) return;
 
-    // Per-hand: /hand id x y z_mm z_vel gesture_id (only if SC instruments enabled)
+    // Compute target node position
+    float tx = 0.0f, ty = 0.0f, tz = 0.0f;
+    bool hasTarget = (target_node_idx_ >= 0 && target_node_idx_ < 12);
+    if (hasTarget) {
+        float theta = target_node_idx_ * 2.39996f; // golden angle
+        ty = 1.0f - (target_node_idx_ / 11.0f) * 2.0f;
+        float radius = std::sqrt(1.0f - ty * ty);
+        tx = radius * std::cos(theta);
+        tz = radius * std::sin(theta);
+        tx *= 1.2f; ty *= 1.2f; tz *= 1.2f; // scale by SPHERE_RADIUS = 1.2
+
+        float theta_rot = elapsed_time_ * 0.04f;
+        float cosR = std::cos(theta_rot);
+        float sinR = std::sin(theta_rot);
+        float rx = tx * cosR - tz * sinR;
+        float rz = tx * sinR + tz * cosR;
+        tx = rx; tz = rz;
+    }
+
+    // Per-hand: /hand id x y z_mm z_vel gesture_id dist_factor (only if SC instruments enabled)
     std::set<int> active_buckets;
     if (scInstruments) {
         for (const auto& h : hands) {
+            float dist_factor = 1.0f;
+            if (hasTarget) {
+                float aspect = 16.f / 9.f;
+                float hx = (h.x * 2.0f - 1.0f) * 2.0f * aspect;
+                float hy = (1.0f - h.y * 2.0f) * 1.5f;
+                float hz = (h.z * 2.0f - 1.0f) * 1.5f;
+
+                float dist = std::sqrt((hx - tx)*(hx - tx) + (hy - ty)*(hy - ty) + (hz - tz)*(hz - tz));
+                dist_factor = dist / 3.0f;
+                if (dist_factor < 0.0f) dist_factor = 0.0f;
+                if (dist_factor > 1.0f) dist_factor = 1.0f;
+            }
+
 #ifdef HAVE_LIBLO
             lo_message m = lo_message_new();
             lo_message_add_int32(m, h.id);
@@ -153,6 +191,7 @@ void OscSender::send(const HandList& hands, const MusicParams& p, const GameStat
             lo_message_add_float(m, h.z_mm);
             lo_message_add_float(m, h.z_vel);
             lo_message_add_float(m, (float)(int)h.gesture);
+            lo_message_add_float(m, dist_factor);
             lo_send_message(addr_, "/hand", m);
             lo_message_free(m);
 #endif
@@ -228,7 +267,7 @@ void OscSender::send(const HandList& hands, const MusicParams& p, const GameStat
     if (first_ || std::fabs(p.reverb - prev_.reverb) > 0.02f ||
                   std::fabs(p.delay  - prev_.delay)  > 0.02f) sendFx(p.reverb, p.delay);
     if (first_ || std::fabs(p.pan    - prev_.pan)    > 0.05f) sendSpatial(p.pan, 0.f);
-    if (first_ || p.muted != prev_.muted)                      sendMute(p.muted);
+    if (first_ || p.muted != prev_.muted)                      sendMute(preview_muted_ || p.muted);
     if (!p.muted) {
         int pitch = (int)std::round(p.pitch);
         if (first_ || pitch != (int)std::round(prev_.pitch) ||
@@ -298,4 +337,30 @@ void OscSender::sendPool(const InstrumentPool& pool, const HandList& hands, cons
             sendCtrl(tidal_, (prefix + "active").c_str(), a.releaseTimer > 0 ? 1.f : 0.f);
         }
     }
+}
+
+void OscSender::sendTidalCtrl(const char* key, float val) {
+    ::sendCtrl(tidal_, key, val);
+}
+
+void OscSender::sendTidalCtrlStr(const char* key, const char* val) {
+    ::sendCtrlStr(tidal_, key, val);
+}
+
+void OscSender::sendDirtPlay(int midi, float amp, float decay) {
+#ifdef HAVE_LIBLO
+    if (!addr_) return;
+    lo_message m = lo_message_new();
+    lo_message_add_string(m, "cps");      lo_message_add_float(m, 0.5f);
+    lo_message_add_string(m, "cycle");    lo_message_add_float(m, 0.f);
+    lo_message_add_string(m, "delta");    lo_message_add_float(m, 0.5f);
+    lo_message_add_string(m, "orbit");    lo_message_add_int32(m, 0);
+    lo_message_add_string(m, "s");        lo_message_add_string(m, "superpiano");
+    lo_message_add_string(m, "note");     lo_message_add_float(m, (float)(midi - 60));
+    lo_message_add_string(m, "gain");     lo_message_add_float(m, amp);
+    lo_message_add_string(m, "sustain");  lo_message_add_float(m, decay);
+    lo_message_add_string(m, "room");     lo_message_add_float(m, 0.4f);
+    lo_send_message(addr_, "/dirt/play", m);
+    lo_message_free(m);
+#endif
 }

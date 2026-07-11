@@ -108,12 +108,25 @@ if [ "$OS" = "Darwin" ]; then
     BIN_PID=$!
     sleep 3
 
-    echo "  Opening browser..."
-    open "http://localhost:8080/?shader=${SHADER}"
+    ENABLE_VISUALIZER=0
+    if grep -q '"enable_visualizer"[[:space:]]*:[[:space:]]*true' "$CONFIG"; then
+        ENABLE_VISUALIZER=1
+    fi
+
+    if [ "$ENABLE_VISUALIZER" = "0" ]; then
+        echo "  Opening browser..."
+        open "http://localhost:8080/?shader=${SHADER}"
+    fi
 
 else
     # Linux/Pi
     CONFIG="$ROOT/config.pi.json"
+    echo "  Killing any running instrument/SC/Tidal instances..."
+    pkill -9 -f "sclang" || true
+    pkill -9 -f "scsynth" || true
+    pkill -9 -f "ghci" || true
+    pkill -9 -f "instrument" || true
+    sleep 2
     SCLANG=$(command -v sclang || echo "")
     if [ -n "$SCLANG" ]; then
         # Initialize quarks/tidal-looper submodule if empty
@@ -123,8 +136,7 @@ else
         fi
 
         # Check and install missing SuperCollider Quarks (SuperDirt, TidalLooper)
-        echo "  Checking SuperCollider Quarks..."
-        if ! echo 'if(\SuperDirt.asClass.notNil && { \TidalLooper.asClass.notNil }) { 0.exit } { 1.exit };' | "$SCLANG" >/dev/null 2>&1; then
+        if [ ! -d "$HOME/.local/share/SuperCollider/downloaded-quarks/SuperDirt" ]; then
             echo "  Installing missing Quarks (SuperDirt, TidalLooper)..."
             echo 'Quarks.install("SuperDirt"); Quarks.install("'"$HOME"'/Documents/tidal/quarks/tidal-looper"); 0.exit;' | "$SCLANG" >/dev/null 2>&1
         fi
@@ -151,18 +163,27 @@ else
     BIN_PID=$!
     sleep 2
 
+    ENABLE_VISUALIZER=0
+    if grep -q '"enable_visualizer"[[:space:]]*:[[:space:]]*true' "$CONFIG"; then
+        ENABLE_VISUALIZER=1
+    fi
+
     export DISPLAY=:0
-    BROWSER=$(command -v chromium-browser || command -v chromium || echo "")
-    if [ -n "$BROWSER" ]; then
-        "$BROWSER" --kiosk --no-sandbox \
-            --disable-infobars --noerrdialogs \
-            --ignore-gpu-blocklist \
-            --enable-gpu-rasterization \
-            --enable-zero-copy \
-            --app="http://127.0.0.1:8080/?shader=${SHADER}" &
-        CHROM_PID=$!
+    if [ "$ENABLE_VISUALIZER" = "0" ]; then
+        BROWSER=$(command -v chromium-browser || command -v chromium || echo "")
+        if [ -n "$BROWSER" ]; then
+            "$BROWSER" --kiosk --no-sandbox \
+                --disable-infobars --noerrdialogs \
+                --ignore-gpu-blocklist \
+                --enable-gpu-rasterization \
+                --enable-zero-copy \
+                --app="http://127.0.0.1:8080/?shader=${SHADER}" &
+            CHROM_PID=$!
+        else
+            echo "WARNING: Chromium not found! Open a browser and visit: http://localhost:8080/?shader=${SHADER}"
+        fi
     else
-        echo "WARNING: Chromium not found! Open a browser and visit: http://localhost:8080/?shader=${SHADER}"
+        echo "  Native visualizer enabled — skipping Chromium launch."
     fi
 fi
 

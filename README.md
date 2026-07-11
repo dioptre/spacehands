@@ -1,6 +1,9 @@
 ## Supercollider
 
 ```
+
+ghci -ghci-script ~/Documents/tidal/boot-instrument.ghci
+
 load("/Users/andrewgrosser/Documents/ag/instrument/supercollider/boot.scd");
 
 ~instrumentSynths.postln

@@ -13,6 +13,7 @@ if [ "$OS" = "Darwin" ]; then
     brew install opencv   # includes DNN module — used for ONNX hand detection
     brew install liblo
     brew install ffmpeg   # ffmpeg/ffplay used for 2-way projector ↔ Pi audio bridge
+    brew install glfw glew glm
 
     # SuperCollider — install .app via cask if sclang not already present
     if [ ! -x "/Applications/SuperCollider.app/Contents/MacOS/sclang" ] && ! command -v sclang &>/dev/null; then
@@ -52,7 +53,11 @@ elif [ "$OS" = "Linux" ]; then
         libreadline-dev \
         libxkbcommon-dev \
         jackd2 \
-        pipewire-jack
+        pipewire-jack \
+        libglfw3-dev \
+        libglew-dev \
+        libglm-dev \
+        sc3-plugins
 
     # Note: libopencv-dev includes the DNN module which runs ONNX models on CPU.
     # ffmpeg/ffplay handles the constant 2-way audio bridge; alsa-utils helps

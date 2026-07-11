@@ -101,13 +101,15 @@ build: check-deps
 	cmake --build "$(BUILD)" -j"$$NCPU"
 
 # Auto role:
-#   Raspberry Pi: install/update/start boot service
+#   Raspberry Pi: run in foreground for now.
+#   Service auto-install is intentionally disabled while we stabilize Pi power/audio.
+#   Later, switch the Pi branch back to: $(MAKE) install-service
 #   macOS or other Linux laptop: projector page connecting to PI=<host>
 run:
 	@set -euo pipefail; \
 	if [ "$(IS_RPI)" = "1" ]; then \
-	  echo "Auto-detected Raspberry Pi; installing/updating boot service."; \
-	  $(MAKE) install-service; \
+	  echo "Auto-detected Raspberry Pi; running Pi role in foreground."; \
+	  $(MAKE) pi; \
 	elif [ "$(OS)" = "Darwin" ] || [ "$(OS)" = "Linux" ]; then \
 	  echo "Auto-detected projector/laptop; running projector role."; \
 	  $(MAKE) projector PI="$(PI)"; \
@@ -116,6 +118,7 @@ run:
 	fi
 
 # Raspberry Pi service role: install/update service, enable it for boot, and start now.
+# Not called by default right now; run `make install-service` manually when ready.
 install-service: build
 	@if [ "$(IS_RPI)" != "1" ]; then \
 	  echo "ERROR: install-service is only intended for Raspberry Pi."; \

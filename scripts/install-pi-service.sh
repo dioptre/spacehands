@@ -32,6 +32,7 @@ Group=$GROUP_NAME
 WorkingDirectory=$ROOT
 Environment=HOME=/home/$USER_NAME
 Environment=CONFIG=$CONFIG_PATH
+Environment=BUILD_JOBS=1
 ExecStart=$ROOT/scripts/run-pi-camera-stream.sh
 Restart=always
 RestartSec=3

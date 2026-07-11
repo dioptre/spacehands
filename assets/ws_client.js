@@ -4,6 +4,7 @@ window.instrumentState = {
     level: 0, progress: 0, phase: 0, hint: 'UNKNOWN',
     tempo: 120, instrument: 0, num_hands: 0, hands: [],
     fx: { reverb: 0.2, delay: 0 },
+    sequence: [],
 };
 window.camBitmap = null;
 

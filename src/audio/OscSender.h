@@ -24,6 +24,15 @@ public:
     // Global:   /tempo /fx /level /mute on change
     void send(const HandList& hands, const MusicParams& p, const GameStateData& state, bool scInstruments = true);
 
+    // Custom helper methods for visualizer/game triggering
+    void sendTidalCtrl(const char* key, float val);
+    void sendTidalCtrlStr(const char* key, const char* val);
+    void sendDirtPlay(int midi, float amp, float decay);
+    void sendMute(bool muted);
+    void setPreviewMute(bool muted);
+    void setElapsedTime(float t);
+    void setTargetNode(int idx);
+
 private:
     std::string host_;
     int         port_;
@@ -37,6 +46,9 @@ private:
 
     MusicParams prev_;
     bool first_ = true;
+    bool preview_muted_ = false;
+    float elapsed_time_ = 0.0f;
+    int target_node_idx_ = -1;
 
     void sendInstrument(int id);
     void sendNote(int pitch, float velocity);
@@ -44,5 +56,4 @@ private:
     void sendFx(float reverb, float delay);
     void sendSpatial(float x, float y);
     void sendLevel(int level);
-    void sendMute(bool muted);
 };

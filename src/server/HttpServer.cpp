@@ -1,4 +1,5 @@
 #include "HttpServer.h"
+#include "../audio/OscSender.h"
 #include <httplib.h>
 #include <iostream>
 #include <cmath>
@@ -22,10 +23,11 @@ public:
     void start() {
         std::lock_guard<std::mutex> lk(mutex_);
         stopLocked();
-        // Browser sends MediaRecorder audio/webm;codecs=opus chunks. ffplay decodes
-        // stdin and plays to the Pi's default audio output (headphones/earphones).
-        pipe_ = popen("ffplay -nodisp -autoexit -loglevel error -fflags nobuffer -flags low_delay -i pipe:0 >/dev/null 2>&1", "w");
-        if (!pipe_) std::cerr << "[TalkReceiver] failed to start ffplay; install ffmpeg/ffplay\n";
+        // Browser sends MediaRecorder audio/webm;codecs=opus chunks. ffmpeg decodes
+        // stdin directly to ALSA default output (Pi headphones/earphones). This is
+        // more reliable in a boot service than ffplay, which depends on SDL/Pulse.
+        pipe_ = popen("ffmpeg -hide_banner -loglevel warning -fflags nobuffer -flags low_delay -i pipe:0 -vn -ac 1 -ar 48000 -f alsa default", "w");
+        if (!pipe_) std::cerr << "[TalkReceiver] failed to start ffmpeg; install ffmpeg and configure ALSA default output\n";
         else        std::cout << "[TalkReceiver] listening: projector mic → Pi audio out\n";
     }
 
@@ -66,15 +68,15 @@ std::shared_ptr<PiMicStream> openPiMicStream() {
     // Captures the Pi's default ALSA microphone, encodes Opus/WebM, and exposes
     // it as a browser-playable stream. If needed, set the default input with
     // raspi-config / ALSA, or replace "default" with a device like "hw:1,0".
-    FILE* p = popen("ffmpeg -hide_banner -loglevel error -f alsa -i default -ac 1 -ar 48000 -c:a libopus -b:a 48k -application voip -fflags nobuffer -flags low_delay -f webm pipe:1 2>/dev/null", "r");
+    FILE* p = popen("ffmpeg -hide_banner -loglevel warning -f alsa -i default -ac 1 -ar 48000 -c:a libopus -b:a 32k -application voip -fflags nobuffer -flags low_delay -f webm pipe:1", "r");
     if (!p) std::cerr << "[PiMicStream] failed to start ffmpeg; install ffmpeg and connect a mic\n";
     else    std::cout << "[PiMicStream] streaming Pi mic → projector speaker\n";
     return std::make_shared<PiMicStream>(p);
 }
 }
 
-HttpServer::HttpServer(const std::string& assets_dir, int port)
-    : assets_dir_(assets_dir), port_(port) {}
+HttpServer::HttpServer(const std::string& assets_dir, int port, OscSender* osc)
+    : assets_dir_(assets_dir), port_(port), osc_(osc) {}
 
 void HttpServer::start() {
     running_ = true;
@@ -211,6 +213,55 @@ void HttpServer::start() {
         });
 
         svr.Options("/note", [](const httplib::Request&, httplib::Response& res) {
+            res.set_header("Access-Control-Allow-Origin",  "*");
+            res.set_header("Access-Control-Allow-Methods", "POST, OPTIONS");
+            res.set_header("Access-Control-Allow-Headers", "Content-Type");
+            res.status = 204;
+        });
+
+        // /mute POST — mute/unmute hand instruments
+        svr.Post("/mute", [this](const httplib::Request& req, httplib::Response& res) {
+#ifdef HAVE_LIBLO
+            try {
+                auto j = nlohmann::json::parse(req.body);
+                bool muted = j.value("muted", false);
+                if (osc_) {
+                    osc_->setPreviewMute(muted);
+                } else {
+                    lo_address sc = lo_address_new("127.0.0.1", "57120");
+                    lo_message m = lo_message_new();
+                    lo_message_add_int32(m, muted ? 1 : 0);
+                    lo_send_message(sc, "/mute", m);
+                    lo_message_free(m);
+                    lo_address_free(sc);
+                }
+            } catch (...) {}
+#endif
+            res.set_content("ok", "text/plain");
+            res.set_header("Access-Control-Allow-Origin", "*");
+        });
+
+        svr.Options("/mute", [](const httplib::Request&, httplib::Response& res) {
+            res.set_header("Access-Control-Allow-Origin",  "*");
+            res.set_header("Access-Control-Allow-Methods", "POST, OPTIONS");
+            res.set_header("Access-Control-Allow-Headers", "Content-Type");
+            res.status = 204;
+        });
+
+        // /target POST — active target node index from browser
+        svr.Post("/target", [this](const httplib::Request& req, httplib::Response& res) {
+            try {
+                auto j = nlohmann::json::parse(req.body);
+                int target = j.value("target", -1);
+                if (osc_) {
+                    osc_->setTargetNode(target);
+                }
+            } catch (...) {}
+            res.set_content("ok", "text/plain");
+            res.set_header("Access-Control-Allow-Origin", "*");
+        });
+
+        svr.Options("/target", [](const httplib::Request&, httplib::Response& res) {
             res.set_header("Access-Control-Allow-Origin",  "*");
             res.set_header("Access-Control-Allow-Methods", "POST, OPTIONS");
             res.set_header("Access-Control-Allow-Headers", "Content-Type");

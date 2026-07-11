@@ -21,6 +21,7 @@ Config Config::load(const std::string& path) {
         if (j.contains("camera_width")) cfg.camera_width  = j["camera_width"];
         if (j.contains("camera_height"))cfg.camera_height = j["camera_height"];
         if (j.contains("target_fps"))   cfg.target_fps  = j["target_fps"];
+        if (j.contains("max_depth_mm"))  cfg.max_depth_mm = j["max_depth_mm"];
         if (j.contains("yolo_model"))   cfg.yolo_model  = j["yolo_model"];
         if (j.contains("yolo_conf"))    cfg.yolo_conf   = j["yolo_conf"];
         if (j.contains("yolo_iou"))     cfg.yolo_iou    = j["yolo_iou"];
@@ -42,6 +43,14 @@ Config Config::load(const std::string& path) {
         if (j.contains("http_port"))    cfg.http_port   = j["http_port"];
         if (j.contains("mjpeg_port"))   cfg.mjpeg_port  = j["mjpeg_port"];
         if (j.contains("mjpeg_source")) cfg.mjpeg_source = j["mjpeg_source"];
+        if (j.contains("enable_visualizer")) cfg.enable_visualizer = j["enable_visualizer"];
+        if (j.contains("visualizer_width"))  cfg.visualizer_width  = j["visualizer_width"];
+        if (j.contains("visualizer_height")) cfg.visualizer_height = j["visualizer_height"];
+        if (j.contains("fullscreen"))        cfg.fullscreen        = j["fullscreen"];
+        if (j.contains("crop_left"))         cfg.crop_left         = j["crop_left"];
+        if (j.contains("crop_right"))        cfg.crop_right        = j["crop_right"];
+        if (j.contains("show_hints"))        cfg.show_hints        = j["show_hints"];
+        if (j.contains("show_preview_history")) cfg.show_preview_history = j["show_preview_history"];
     } catch (const std::exception& e) {
         std::cerr << "[Config] parse error: " << e.what() << "\n";
     }

@@ -21,17 +21,24 @@ struct AxisRange {
 };
 
 static std::string buildJson(const GameStateData& state, const HandList& hands, bool mirrorX,
-                              float xMin, float xMax, float yMin, float yMax, float zMin, float zMax) {
+                              float xMin, float xMax, float yMin, float yMax, float zMin, float zMax,
+                              bool showHints, bool showPreviewHistory,
+                              const std::vector<int>& sequence) {
     using json = nlohmann::json;
     AxisRange rx(xMin, xMax), ry(yMin, yMax), rz(zMin, zMax);
 
     json j;
-    j["level"]     = state.level;
-    j["progress"]  = state.progress;
-    j["hint"]      = gestureName(state.hint);
-    j["tempo"]     = state.music.tempo;
-    j["num_hands"] = (int)hands.size();
-    j["fx"]        = { {"reverb", state.music.reverb} };
+    j["level"]      = state.level;
+    j["progress"]   = state.progress;
+    j["hint"]       = gestureName(state.hint);
+    j["tempo"]      = state.music.tempo;
+    j["num_hands"]  = (int)hands.size();
+    j["fx"]         = { {"reverb", state.music.reverb} };
+    j["show_hints"] = showHints;
+    j["show_preview_history"] = showPreviewHistory;
+    if (!sequence.empty()) {
+        j["sequence"] = sequence;
+    }
 
     float cx = 0, cy = 0;
     json jarr = json::array();
@@ -53,9 +60,11 @@ static std::string buildJson(const GameStateData& state, const HandList& hands, 
 }
 
 void WsServer::broadcast(const GameStateData& state, const HandList& hands, bool mirrorX,
-                          float xMin, float xMax, float yMin, float yMax, float zMin, float zMax) {
+                          float xMin, float xMax, float yMin, float yMax, float zMin, float zMax,
+                          bool showHints, bool showPreviewHistory,
+                          const std::vector<int>& sequence) {
     std::lock_guard<std::mutex> lk(mutex_);
-    latest_json_ = buildJson(state, hands, mirrorX, xMin, xMax, yMin, yMax, zMin, zMax);
+    latest_json_ = buildJson(state, hands, mirrorX, xMin, xMax, yMin, yMax, zMin, zMax, showHints, showPreviewHistory, sequence);
 }
 
 void WsServer::start() {

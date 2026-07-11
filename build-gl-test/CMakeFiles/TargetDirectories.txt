@@ -1,0 +1,3 @@
+/Users/andrewgrosser/Documents/spacehands/build-gl-test/CMakeFiles/instrument.dir
+/Users/andrewgrosser/Documents/spacehands/build-gl-test/CMakeFiles/edit_cache.dir
+/Users/andrewgrosser/Documents/spacehands/build-gl-test/CMakeFiles/rebuild_cache.dir

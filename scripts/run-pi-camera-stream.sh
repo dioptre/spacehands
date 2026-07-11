@@ -6,6 +6,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD="$ROOT/build"
 CONFIG="${CONFIG:-$ROOT/config.projector-pi.json}"
 NCPU="$(nproc 2>/dev/null || echo 4)"
+# Give undervolted Pi setups a better chance. Override with BUILD_JOBS=<n>.
+BUILD_JOBS="${BUILD_JOBS:-1}"
 
 if ! command -v python3 >/dev/null 2>&1; then
   echo "ERROR: python3 is required for network auto-discovery."
@@ -20,7 +22,7 @@ if ! command -v ffmpeg >/dev/null 2>&1 || ! command -v ffplay >/dev/null 2>&1; t
 fi
 
 cmake -S "$ROOT" -B "$BUILD" -DCMAKE_BUILD_TYPE=Release
-cmake --build "$BUILD" -j"$NCPU"
+cmake --build "$BUILD" -j"$BUILD_JOBS"
 
 cd "$ROOT"
 python3 "$ROOT/scripts/discover.py" announce &

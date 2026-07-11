@@ -47,7 +47,7 @@ InstrumentPool::InstrumentPool()
 
 int InstrumentPool::pickOrbit() {
     std::vector<int> free;
-    for (int i = 0; i < MAX_HANDS; ++i)
+    for (int i = 1; i < MAX_HANDS; ++i)
         if (!orbitUsed_[i]) free.push_back(i);
     if (free.empty()) return -1;
     return free[std::uniform_int_distribution<int>(0, free.size()-1)(rng_)];

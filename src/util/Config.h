@@ -8,6 +8,7 @@ struct Config {
     int camera_width        = 240;
     int camera_height       = 180;
     int target_fps          = 30;
+    float max_depth_mm      = 1500.0f; // maximum depth for masking / tracking
 
     // model
     std::string yolo_model  = "models/yolov8n-hand-int8";
@@ -38,6 +39,16 @@ struct Config {
     // "depth" = raw ToF depth, "depth_color" = Arducam example-style rainbow depth,
     // "color" = colour camera if present.
     std::string mjpeg_source = "processed";
+
+    // visualizer
+    bool enable_visualizer  = false;
+    int  visualizer_width   = 1280;
+    int  visualizer_height  = 720;
+    bool fullscreen         = false;
+    int  crop_left          = 0;
+    int  crop_right         = 0;
+    bool show_hints         = true;
+    bool show_preview_history = false;
 
     static Config load(const std::string& path);
 };
