@@ -15,6 +15,7 @@ import json
 import signal
 import subprocess
 import sys
+import time
 from fractions import Fraction
 
 import av
@@ -34,6 +35,7 @@ class AlsaAudioTrack(MediaStreamTrack):
         self.samples = int(sample_rate * frame_ms / 1000)
         self.frame_bytes = self.samples * channels * 2  # s16le
         self.pts = 0
+        self.last_level_log = 0.0
         self.proc = subprocess.Popen(
             [
                 "arecord", "-q",
@@ -54,6 +56,14 @@ class AlsaAudioTrack(MediaStreamTrack):
         data = await asyncio.to_thread(self.proc.stdout.read, self.frame_bytes)
         if len(data) != self.frame_bytes:
             raise EOFError("short ALSA capture read")
+        samples_i16 = np.frombuffer(data, dtype=np.int16)
+        now = time.time()
+        if now - self.last_level_log >= 2.0:
+            rms = float(np.sqrt(np.mean(samples_i16.astype(np.float32) ** 2))) if samples_i16.size else 0.0
+            peak = int(np.max(np.abs(samples_i16))) if samples_i16.size else 0
+            print(f"[webrtc] Pi mic level rms={rms:.1f} peak={peak}", flush=True)
+            self.last_level_log = now
+
         # Build a mono s16 frame directly. This avoids PyAV ndarray shape
         # ambiguity for packed-vs-planar mono audio and is more reliable in aiortc.
         frame = AudioFrame(format="s16", layout="mono", samples=self.samples)
@@ -150,7 +160,10 @@ async def make_app(args):
         @pc.on("connectionstatechange")
         async def on_connectionstatechange():
             print(f"[webrtc] connection state: {pc.connectionState}", flush=True)
-            if pc.connectionState in ("failed", "closed", "disconnected"):
+            # Do not immediately close on "disconnected". Bluetooth output/device
+            # changes and brief Wi-Fi hiccups can cause transient disconnected states;
+            # closing here forces the browser into a noisy reconnect loop.
+            if pc.connectionState in ("failed", "closed"):
                 await close_pc(pc, mic_track, players, pcs)
 
         await pc.setRemoteDescription(offer)
