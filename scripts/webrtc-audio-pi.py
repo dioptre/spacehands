@@ -40,13 +40,14 @@ class AlsaAudioTrack(MediaStreamTrack):
             pulse_device = device.removeprefix("pulse:")
             cmd = [
                 "parec",
-                "--device", pulse_device,
                 "--format", "s16le",
                 "--channels", str(channels),
                 "--rate", str(sample_rate),
                 "--raw",
             ]
-            print(f"[webrtc] capturing Pi mic via Pulse/PipeWire source: {pulse_device}", flush=True)
+            if pulse_device and pulse_device not in ("default", "@DEFAULT_SOURCE@"):
+                cmd[1:1] = ["--device", pulse_device]
+            print(f"[webrtc] capturing Pi mic via Pulse/PipeWire source: {pulse_device or '@DEFAULT_SOURCE@'}", flush=True)
         else:
             cmd = [
                 "arecord", "-q",
@@ -103,13 +104,14 @@ class AlsaPlayer:
             cmd = [
                 "pacat",
                 "--playback",
-                "--device", pulse_device,
                 "--format", "s16le",
                 "--channels", str(channels),
                 "--rate", str(sample_rate),
                 "--raw",
             ]
-            print(f"[webrtc] playing projector mic via Pulse/PipeWire sink: {pulse_device}", flush=True)
+            if pulse_device and pulse_device not in ("default", "@DEFAULT_SINK@"):
+                cmd[2:2] = ["--device", pulse_device]
+            print(f"[webrtc] playing projector mic via Pulse/PipeWire sink: {pulse_device or '@DEFAULT_SINK@'}", flush=True)
         else:
             cmd = [
                 "aplay", "-q",
