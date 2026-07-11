@@ -4,6 +4,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 USER_NAME="${SUDO_USER:-$(id -un)}"
+USER_ID="$(id -u "$USER_NAME")"
 GROUP_NAME="$(id -gn "$USER_NAME" 2>/dev/null || echo "$USER_NAME")"
 SERVICE_NAME="spacehands-pi.service"
 SERVICE_PATH="/etc/systemd/system/$SERVICE_NAME"
@@ -21,6 +22,11 @@ if [ ! -f "$ROOT/scripts/run-pi-camera-stream.sh" ]; then
   exit 1
 fi
 
+# Bluetooth/Pulse/PipeWire audio is usually owned by the logged-in user's session,
+# even though this is a system service. Give the service that user session's runtime
+# paths so pactl/parec/pacat can see Bluetooth sources/sinks.
+sudo loginctl enable-linger "$USER_NAME" 2>/dev/null || true
+
 sudo tee "$SERVICE_PATH" >/dev/null <<EOF
 [Unit]
 Description=Spacehands Pi camera stream and two-way audio bridge
@@ -33,6 +39,9 @@ User=$USER_NAME
 Group=$GROUP_NAME
 WorkingDirectory=$ROOT
 Environment=HOME=/home/$USER_NAME
+Environment=XDG_RUNTIME_DIR=/run/user/$USER_ID
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$USER_ID/bus
+Environment=PULSE_SERVER=unix:/run/user/$USER_ID/pulse/native
 Environment=CONFIG=$CONFIG_PATH
 Environment=BUILD_JOBS=1
 Environment=PI_AUDIO_IN=$PI_AUDIO_IN_VAL
