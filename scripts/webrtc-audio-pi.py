@@ -36,15 +36,29 @@ class AlsaAudioTrack(MediaStreamTrack):
         self.frame_bytes = self.samples * channels * 2  # s16le
         self.pts = 0
         self.last_level_log = 0.0
-        self.proc = subprocess.Popen(
-            [
+        if device.startswith("pulse:") or device.startswith("bluez_"):
+            pulse_device = device.removeprefix("pulse:")
+            cmd = [
+                "parec",
+                "--device", pulse_device,
+                "--format", "s16le",
+                "--channels", str(channels),
+                "--rate", str(sample_rate),
+                "--raw",
+            ]
+            print(f"[webrtc] capturing Pi mic via Pulse/PipeWire source: {pulse_device}", flush=True)
+        else:
+            cmd = [
                 "arecord", "-q",
                 "-D", device,
                 "-f", "S16_LE",
                 "-c", str(channels),
                 "-r", str(sample_rate),
                 "-t", "raw",
-            ],
+            ]
+            print(f"[webrtc] capturing Pi mic via ALSA device: {device}", flush=True)
+        self.proc = subprocess.Popen(
+            cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             bufsize=0,
@@ -84,15 +98,30 @@ class AlsaPlayer:
     def __init__(self, device="default", sample_rate=48000, channels=1):
         self.sample_rate = sample_rate
         self.channels = channels
-        self.proc = subprocess.Popen(
-            [
+        if device.startswith("pulse:") or device.startswith("bluez_"):
+            pulse_device = device.removeprefix("pulse:")
+            cmd = [
+                "pacat",
+                "--playback",
+                "--device", pulse_device,
+                "--format", "s16le",
+                "--channels", str(channels),
+                "--rate", str(sample_rate),
+                "--raw",
+            ]
+            print(f"[webrtc] playing projector mic via Pulse/PipeWire sink: {pulse_device}", flush=True)
+        else:
+            cmd = [
                 "aplay", "-q",
                 "-D", device,
                 "-f", "S16_LE",
                 "-c", str(channels),
                 "-r", str(sample_rate),
                 "-t", "raw",
-            ],
+            ]
+            print(f"[webrtc] playing projector mic via ALSA device: {device}", flush=True)
+        self.proc = subprocess.Popen(
+            cmd,
             stdin=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             bufsize=0,

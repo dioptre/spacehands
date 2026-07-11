@@ -34,7 +34,10 @@ cmake --build "$BUILD" -j"$BUILD_JOBS"
 cd "$ROOT"
 python3 "$ROOT/scripts/discover.py" announce &
 DISCOVER_PID=$!
-"$WEBRTC_VENV/bin/python" "$ROOT/scripts/webrtc-audio-pi.py" --port 8091 &
+"$WEBRTC_VENV/bin/python" "$ROOT/scripts/webrtc-audio-pi.py" \
+  --port 8091 \
+  --input-device "${PI_AUDIO_IN:-default}" \
+  --output-device "${PI_AUDIO_OUT:-default}" &
 WEBRTC_PID=$!
 cleanup() { kill "$DISCOVER_PID" "$WEBRTC_PID" 2>/dev/null || true; }
 trap cleanup EXIT INT TERM
