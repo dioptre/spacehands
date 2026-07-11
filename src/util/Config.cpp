@@ -41,6 +41,7 @@ Config Config::load(const std::string& path) {
         if (j.contains("ws_port"))      cfg.ws_port     = j["ws_port"];
         if (j.contains("http_port"))    cfg.http_port   = j["http_port"];
         if (j.contains("mjpeg_port"))   cfg.mjpeg_port  = j["mjpeg_port"];
+        if (j.contains("mjpeg_source")) cfg.mjpeg_source = j["mjpeg_source"];
     } catch (const std::exception& e) {
         std::cerr << "[Config] parse error: " << e.what() << "\n";
     }

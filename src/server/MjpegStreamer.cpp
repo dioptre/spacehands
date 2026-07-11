@@ -5,6 +5,7 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <cmath>
 
 MjpegStreamer::MjpegStreamer(int port) : port_(port) {}
 
@@ -12,11 +13,20 @@ void MjpegStreamer::pushFrame(const cv::Mat& frame) {
     if (frame.empty()) return;
     cv::Mat display;
     if (frame.type() == CV_32F) {
-        // ToF confidence frame (0-1024) — convert to grayscale uint8
-        frame.convertTo(display, CV_8U, 255.f / 1024.f);
+        // ToF confidence/depth frames — normalize current raw range to grayscale.
+        // This preserves a visible raw camera view for projector streaming whether
+        // the source is confidence (usually 0-1024) or depth (millimetres).
+        double minv = 0.0, maxv = 0.0;
+        cv::minMaxLoc(frame, &minv, &maxv);
+        if (std::isfinite(minv) && std::isfinite(maxv) && maxv > minv) {
+            frame.convertTo(display, CV_8U, 255.0 / (maxv - minv), -minv * 255.0 / (maxv - minv));
+        } else {
+            frame.convertTo(display, CV_8U, 255.f / 1024.f);
+        }
     } else if (frame.type() == CV_8UC3) {
-        // Colour BGR frame — boost brightness for dark webcam environments
-        frame.convertTo(display, CV_8UC3, 3.0, 20); // 3x gain + 20 offset
+        // Colour/depth-colormap BGR frame — send as-is. Brightness boosting would
+        // distort the Arducam example-style rainbow depth preview.
+        display = frame.clone();
     } else {
         display = frame.clone();
     }

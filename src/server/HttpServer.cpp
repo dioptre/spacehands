@@ -2,6 +2,10 @@
 #include <httplib.h>
 #include <iostream>
 #include <cmath>
+#include <cstdio>
+#include <mutex>
+#include <array>
+#include <memory>
 #if __has_include(<nlohmann/json.hpp>)
 #  include <nlohmann/json.hpp>
 #else
@@ -12,6 +16,63 @@
 #  include <lo/lo.h>
 #endif
 
+namespace {
+class TalkReceiver {
+public:
+    void start() {
+        std::lock_guard<std::mutex> lk(mutex_);
+        stopLocked();
+        // Browser sends MediaRecorder audio/webm;codecs=opus chunks. ffplay decodes
+        // stdin and plays to the Pi's default audio output (headphones/earphones).
+        pipe_ = popen("ffplay -nodisp -autoexit -loglevel error -fflags nobuffer -flags low_delay -i pipe:0 >/dev/null 2>&1", "w");
+        if (!pipe_) std::cerr << "[TalkReceiver] failed to start ffplay; install ffmpeg/ffplay\n";
+        else        std::cout << "[TalkReceiver] listening: projector mic → Pi audio out\n";
+    }
+
+    void chunk(const std::string& bytes) {
+        std::lock_guard<std::mutex> lk(mutex_);
+        if (!pipe_ || bytes.empty()) return;
+        fwrite(bytes.data(), 1, bytes.size(), pipe_);
+        fflush(pipe_);
+    }
+
+    void stop() {
+        std::lock_guard<std::mutex> lk(mutex_);
+        stopLocked();
+    }
+
+private:
+    void stopLocked() {
+        if (!pipe_) return;
+        pclose(pipe_);
+        pipe_ = nullptr;
+        std::cout << "[TalkReceiver] stopped\n";
+    }
+
+    std::mutex mutex_;
+    FILE* pipe_ = nullptr;
+};
+
+TalkReceiver g_talk;
+
+struct PiMicStream {
+    explicit PiMicStream(FILE* p) : pipe(p) {}
+    ~PiMicStream() { if (pipe) pclose(pipe); }
+    FILE* pipe = nullptr;
+    std::array<char, 4096> buf{};
+};
+
+std::shared_ptr<PiMicStream> openPiMicStream() {
+    // Captures the Pi's default ALSA microphone, encodes Opus/WebM, and exposes
+    // it as a browser-playable stream. If needed, set the default input with
+    // raspi-config / ALSA, or replace "default" with a device like "hw:1,0".
+    FILE* p = popen("ffmpeg -hide_banner -loglevel error -f alsa -i default -ac 1 -ar 48000 -c:a libopus -b:a 48k -application voip -fflags nobuffer -flags low_delay -f webm pipe:1 2>/dev/null", "r");
+    if (!p) std::cerr << "[PiMicStream] failed to start ffmpeg; install ffmpeg and connect a mic\n";
+    else    std::cout << "[PiMicStream] streaming Pi mic → projector speaker\n";
+    return std::make_shared<PiMicStream>(p);
+}
+}
+
 HttpServer::HttpServer(const std::string& assets_dir, int port)
     : assets_dir_(assets_dir), port_(port) {}
 
@@ -20,6 +81,50 @@ void HttpServer::start() {
     thread_ = std::thread([this]() {
         httplib::Server svr;
         svr.set_mount_point("/", assets_dir_.c_str());
+
+        // /talk/* — projector browser microphone → Pi default audio output.
+        // Requires ffplay on the Pi: sudo apt install ffmpeg
+        svr.Post("/talk/start", [](const httplib::Request&, httplib::Response& res) {
+            g_talk.start();
+            res.set_content("ok", "text/plain");
+            res.set_header("Access-Control-Allow-Origin", "*");
+        });
+        svr.Post("/talk/chunk", [](const httplib::Request& req, httplib::Response& res) {
+            g_talk.chunk(req.body);
+            res.set_content("ok", "text/plain");
+            res.set_header("Access-Control-Allow-Origin", "*");
+        });
+        svr.Post("/talk/stop", [](const httplib::Request&, httplib::Response& res) {
+            g_talk.stop();
+            res.set_content("ok", "text/plain");
+            res.set_header("Access-Control-Allow-Origin", "*");
+        });
+        svr.Options(R"(/talk/.*)", [](const httplib::Request&, httplib::Response& res) {
+            res.set_header("Access-Control-Allow-Origin",  "*");
+            res.set_header("Access-Control-Allow-Methods", "POST, OPTIONS");
+            res.set_header("Access-Control-Allow-Headers", "Content-Type");
+            res.status = 204;
+        });
+
+        // /pi-mic — Pi microphone → projector browser speaker.
+        // Requires ffmpeg and a default ALSA capture device on the Pi.
+        svr.Get("/pi-mic", [](const httplib::Request&, httplib::Response& res) {
+            auto mic = openPiMicStream();
+            if (!mic || !mic->pipe) {
+                res.status = 503;
+                res.set_content("pi mic unavailable", "text/plain");
+                res.set_header("Access-Control-Allow-Origin", "*");
+                return;
+            }
+            res.set_header("Access-Control-Allow-Origin", "*");
+            res.set_header("Cache-Control", "no-cache");
+            res.set_chunked_content_provider("audio/webm", [mic](size_t, httplib::DataSink& sink) {
+                if (!mic->pipe) return false;
+                size_t n = fread(mic->buf.data(), 1, mic->buf.size(), mic->pipe);
+                if (n == 0) return false;
+                return sink.write(mic->buf.data(), n);
+            });
+        });
 
         // /orb POST — game events from browser → OSC
         // Handles: offering game orbs, transformation station /ctrl messages

@@ -9,8 +9,10 @@ if [ "$OS" = "Darwin" ]; then
     echo "==> macOS: installing via Homebrew"
     brew update
     brew install cmake pkg-config
+    brew install python@3.12
     brew install opencv   # includes DNN module — used for ONNX hand detection
     brew install liblo
+    brew install ffmpeg   # ffmpeg/ffplay used for 2-way projector ↔ Pi audio bridge
 
     # SuperCollider — install .app via cask if sclang not already present
     if [ ! -x "/Applications/SuperCollider.app/Contents/MacOS/sclang" ] && ! command -v sclang &>/dev/null; then
@@ -30,14 +32,20 @@ elif [ "$OS" = "Linux" ]; then
         build-essential \
         cmake \
         pkg-config \
+        python3 \
         git \
         libopencv-dev \
         liblo-dev \
         libssl-dev \
+        ffmpeg \
+        alsa-utils \
+        pulseaudio-utils \
         supercollider \
         supercollider-server
     # Note: libopencv-dev includes the DNN module which runs ONNX models on CPU
     # No NCNN needed — OpenCV DNN handles YOLOX hand detection on Pi 5
+    # ffmpeg/ffplay handles the constant 2-way audio bridge; alsa-utils helps
+    # verify/select Pi microphone and earphone devices (arecord -l, aplay -l).
 
     echo ""
     echo "==> Installing Arducam ToF SDK..."

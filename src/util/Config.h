@@ -33,6 +33,11 @@ struct Config {
     int ws_port             = 8081;
     int http_port           = 8080;
     int mjpeg_port          = 8082;
+    // What to publish on /stream.mjpeg:
+    // "processed" = existing hand-mask projection, "confidence" = raw ToF amplitude,
+    // "depth" = raw ToF depth, "depth_color" = Arducam example-style rainbow depth,
+    // "color" = colour camera if present.
+    std::string mjpeg_source = "processed";
 
     static Config load(const std::string& path);
 };

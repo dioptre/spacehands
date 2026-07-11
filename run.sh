@@ -15,9 +15,12 @@ NEED_DEPS=0
 if [ "$OS" = "Darwin" ]; then
     brew list opencv &>/dev/null || NEED_DEPS=1
     brew list liblo  &>/dev/null || NEED_DEPS=1
+    brew list ffmpeg &>/dev/null || NEED_DEPS=1
 else
     pkg-config --exists liblo   2>/dev/null || NEED_DEPS=1
     pkg-config --exists opencv4 2>/dev/null || NEED_DEPS=1
+    command -v ffmpeg >/dev/null 2>&1 || NEED_DEPS=1
+    command -v ffplay >/dev/null 2>&1 || NEED_DEPS=1
 fi
 if [ "$NEED_DEPS" = "1" ]; then
     echo "  Missing deps — running deps.sh..."

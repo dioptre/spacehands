@@ -15,6 +15,7 @@ static void lo_message_free(lo_message) {}
 static void lo_send_message(void*, const char*, lo_message) {}
 #endif
 #include <opencv2/imgproc.hpp>
+#include <opencv2/core.hpp>
 
 #include "camera/CameraSource.h"
 #include "camera/MockSource.h"
@@ -225,50 +226,72 @@ int main(int argc, char* argv[]) {
         // OSC: pool assignments → Tidal /ctrl
         osc.sendPool(pool, hands, music);
 
-        // MJPEG: hand pixels on black — only within detected bbox, hard luma key
+        // MJPEG: publish either the old processed hand-mask or a raw camera view.
+        // For the projector/walkie setup, set "mjpeg_source": "confidence" (or
+        // "depth" / "color") so the Pi streams the raw 3D camera feed to the
+        // projector machine at http://<pi-ip>:8082/stream.mjpeg.
         static int frame_count = 0;
         if (++frame_count % 2 == 0) {
-            const cv::Mat& src = !f->cam.color.empty() ? f->cam.color : f->cam.confidence;
-            cv::Mat out = cv::Mat::zeros(src.size(), src.type());
+            if (cfg.mjpeg_source == "confidence") {
+                mjpeg.pushFrame(f->cam.confidence);
+            } else if (cfg.mjpeg_source == "depth") {
+                mjpeg.pushFrame(f->cam.depth);
+            } else if (cfg.mjpeg_source == "depth_color") {
+                // Match the colourful Arducam example preview:
+                // depth(mm) → 8-bit scaled by camera range → COLORMAP_RAINBOW,
+                // then mask low-confidence pixels to black.
+                cv::Mat depth8, depth_color;
+                f->cam.depth.convertTo(depth8, CV_8U, 255.0 / 4000.0, 0);
+                cv::applyColorMap(depth8, depth_color, cv::COLORMAP_RAINBOW);
+                if (!f->cam.confidence.empty()) {
+                    depth_color.setTo(cv::Scalar(0, 0, 0), f->cam.confidence < 30.0f);
+                }
+                mjpeg.pushFrame(depth_color);
+            } else if (cfg.mjpeg_source == "color" && !f->cam.color.empty()) {
+                mjpeg.pushFrame(f->cam.color);
+            } else {
+                const cv::Mat& src = !f->cam.color.empty() ? f->cam.color : f->cam.confidence;
+                cv::Mat out = cv::Mat::zeros(src.size(), src.type());
 
-            if (!hands.empty() && src.type() == CV_8UC3) {
-                int W = src.cols, H = src.rows;
-                for (const auto& h : hands) {
-                    // Tight bbox — just the hand area
-                    float bw = h.bw * 1.1f, bh = h.bh * 1.1f;
-                    int rx = std::max(0,    (int)((h.x - bw*0.5f) * W));
-                    int ry = std::max(0,    (int)((h.y - bh*0.5f) * H));
-                    int rw = std::min(W-rx, (int)(bw * W));
-                    int rh = std::min(H-ry, (int)(bh * H));
-                    if (rw <= 0 || rh <= 0) continue;
+                if (!hands.empty() && src.type() == CV_8UC3) {
+                    int W = src.cols, H = src.rows;
+                    for (const auto& h : hands) {
+                        // Tight bbox — just the hand area
+                        float bw = h.bw * 1.1f, bh = h.bh * 1.1f;
+                        int rx = std::max(0,    (int)((h.x - bw*0.5f) * W));
+                        int ry = std::max(0,    (int)((h.y - bh*0.5f) * H));
+                        int rw = std::min(W-rx, (int)(bw * W));
+                        int rh = std::min(H-ry, (int)(bh * H));
+                        if (rw <= 0 || rh <= 0) continue;
 
-                    cv::Mat roi = src(cv::Rect(rx,ry,rw,rh));
+                        cv::Mat roi = src(cv::Rect(rx,ry,rw,rh));
 
-                    // Luma key within bbox only
-                    cv::Mat gray;
-                    cv::cvtColor(roi, gray, cv::COLOR_BGR2GRAY);
-                    // Adaptive threshold relative to roi max — handles varying light
-                    double roiMax;
-                    cv::minMaxLoc(gray, nullptr, &roiMax);
-                    uchar thresh = (uchar)(roiMax * 0.45); // bottom 45% = background
-                    cv::Mat key;
-                    cv::threshold(gray, key, thresh, 255, cv::THRESH_BINARY);
-                    cv::GaussianBlur(key, key, cv::Size(5,5), 1.5);
+                        // Luma key within bbox only
+                        cv::Mat gray;
+                        cv::cvtColor(roi, gray, cv::COLOR_BGR2GRAY);
+                        // Adaptive threshold relative to roi max — handles varying light
+                        double roiMax;
+                        cv::minMaxLoc(gray, nullptr, &roiMax);
+                        uchar thresh = (uchar)(roiMax * 0.45); // bottom 45% = background
+                        cv::Mat key;
+                        cv::threshold(gray, key, thresh, 255, cv::THRESH_BINARY);
+                        cv::GaussianBlur(key, key, cv::Size(5,5), 1.5);
 
-                    cv::Mat out_roi = out(cv::Rect(rx,ry,rw,rh));
-                    for (int y = 0; y < rh; ++y) {
-                        for (int x = 0; x < rw; ++x) {
-                            float k = key.at<uchar>(y,x) / 255.f;
-                            if (k > 0.1f) {
-                                auto p = roi.at<cv::Vec3b>(y,x);
-                                out_roi.at<cv::Vec3b>(y,x) = cv::Vec3b(
-                                    (uchar)(p[0]*k),(uchar)(p[1]*k),(uchar)(p[2]*k));
+                        cv::Mat out_roi = out(cv::Rect(rx,ry,rw,rh));
+                        for (int y = 0; y < rh; ++y) {
+                            for (int x = 0; x < rw; ++x) {
+                                float k = key.at<uchar>(y,x) / 255.f;
+                                if (k > 0.1f) {
+                                    auto p = roi.at<cv::Vec3b>(y,x);
+                                    out_roi.at<cv::Vec3b>(y,x) = cv::Vec3b(
+                                        (uchar)(p[0]*k),(uchar)(p[1]*k),(uchar)(p[2]*k));
+                                }
                             }
                         }
                     }
                 }
+                mjpeg.pushFrame(out);
             }
-            mjpeg.pushFrame(out);
         }
 
         // WebSocket: broadcast full state
