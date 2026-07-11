@@ -400,7 +400,9 @@
     }
 
     async function startAudioLink() {
-        if (audioLinkActive) return;
+        // If a previous auto-start failed before creating a peer, allow a manual
+        // click to try again instead of getting stuck in "active" state.
+        if (audioLinkActive && pc) return;
         audioLinkActive = true;
         reconnectAttempts = 0;
         disconnectedSince = 0;
@@ -412,8 +414,21 @@
             setStatus('WebRTC 2-way audio connected');
         } catch (err) {
             console.error(err);
-            setStatus('WebRTC audio failed: ' + (err.name || err.message));
-            scheduleReconnect(err.message || err.name || 'initial connect failed');
+            stopWatchdog();
+            await stopWebrtcAudio(false);
+            audioLinkActive = false;
+            setAudioUi(false);
+            const name = err.name || '';
+            const msg = err.message || name;
+            setStatus('WebRTC audio failed: ' + msg);
+            // Browsers often block mic/audio auto-start until a user gesture. Do
+            // not spin reconnects for permission/gesture failures; let the Start
+            // button recover it.
+            if (!['NotAllowedError', 'NotFoundError', 'SecurityError', 'AbortError'].includes(name) && autoAudio) {
+                scheduleReconnect(msg || 'initial connect failed');
+            } else if (autoAudio) {
+                setStatus('click start 2-way audio to allow mic/speaker');
+            }
         }
     }
 
