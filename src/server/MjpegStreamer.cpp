@@ -31,9 +31,19 @@ void MjpegStreamer::pushFrame(const cv::Mat& frame) {
         display = frame.clone();
     }
 
+    // Upscale the small ToF frame before JPEG encoding so the browser/projector
+    // receives a smoother image instead of magnifying a 240x180 JPEG directly.
+    if (display.cols > 0 && display.cols < 960) {
+        cv::Mat up;
+        double scale = 960.0 / display.cols;
+        cv::resize(display, up, cv::Size(), scale, scale, cv::INTER_CUBIC);
+        cv::GaussianBlur(up, up, cv::Size(3,3), 0.35);
+        display = std::move(up);
+    }
+
     // Encode to JPEG
     std::vector<uchar> buf;
-    std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, 70};
+    std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, 90};
     cv::imencode(".jpg", display, buf, params);
 
     std::lock_guard<std::mutex> lk(mutex_);

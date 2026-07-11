@@ -12,6 +12,7 @@
     const cropLeftInput = document.getElementById('crop-left');
     const cropRightInput = document.getElementById('crop-right');
     const flipImageBtn = document.getElementById('flip-image');
+    const softenInput = document.getElementById('soften');
     const piAudio = document.getElementById('pi-audio');
     const status = document.getElementById('status');
 
@@ -43,10 +44,19 @@
         localStorage.setItem('spacehandsCropLeft', String(left));
         localStorage.setItem('spacehandsCropRight', String(right));
     }
+
+    function applySoften() {
+        const soften = Math.max(0, Math.min(6, parseFloat(softenInput.value || '0')));
+        document.documentElement.style.setProperty('--soften', soften + 'px');
+        localStorage.setItem('spacehandsSoften', String(soften));
+    }
+
     cropLeftInput.value = localStorage.getItem('spacehandsCropLeft') || '0';
     cropRightInput.value = localStorage.getItem('spacehandsCropRight') || '0';
+    softenInput.value = localStorage.getItem('spacehandsSoften') || '1';
     cropLeftInput.addEventListener('input', applyCrop);
     cropRightInput.addEventListener('input', applyCrop);
+    softenInput.addEventListener('input', applySoften);
 
     let imageFlipped = localStorage.getItem('spacehandsFlipX') === '1';
     function applyFlip() {
@@ -61,6 +71,7 @@
     });
 
     applyCrop();
+    applySoften();
     applyFlip();
     showUiSoon();
 
