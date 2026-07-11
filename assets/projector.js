@@ -6,6 +6,7 @@
     const connectBtn = document.getElementById('connect');
     const talkBtn = document.getElementById('talk');
     const listenBtn = document.getElementById('listen');
+    const autoAudioBtn = document.getElementById('auto-audio');
     const micSelect = document.getElementById('mic-select');
     const speakerSelect = document.getElementById('speaker-select');
     const testSpeakerBtn = document.getElementById('test-speaker');
@@ -110,6 +111,7 @@
     let watchdogTimer = null;
     let reconnectAttempts = 0;
     let disconnectedSince = 0;
+    let autoAudio = localStorage.getItem('spacehandsAutoAudio') !== '0';
 
     const RECONNECT_BASE_MS = 500;
     const RECONNECT_MAX_MS = 4000;
@@ -119,6 +121,8 @@
         listenBtn.classList.toggle('active', active);
         talkBtn.textContent = active ? 'WebRTC audio running' : 'start 2-way audio';
         listenBtn.textContent = active ? 'stop audio' : 'audio stopped';
+        autoAudioBtn.classList.toggle('active', autoAudio);
+        autoAudioBtn.textContent = 'auto audio: ' + (autoAudio ? 'on' : 'off');
     }
 
     function webrtcUrl(path) {
@@ -351,7 +355,9 @@
     }
 
     function scheduleReconnect(reason) {
-        if (!audioLinkActive) return;
+        if (!audioLinkActive && !autoAudio) return;
+        audioLinkActive = true;
+        setAudioUi(true);
         if (reconnectTimer) return;
         reconnectAttempts += 1;
         const delay = Math.min(RECONNECT_MAX_MS, RECONNECT_BASE_MS * reconnectAttempts);
@@ -442,7 +448,11 @@
         }
     }
 
-    async function stopAudioLink() {
+    async function stopAudioLink(disableAuto = false) {
+        if (disableAuto) {
+            autoAudio = false;
+            localStorage.setItem('spacehandsAutoAudio', '0');
+        }
         audioLinkActive = false;
         stopWatchdog();
         await stopWebrtcAudio(true);
@@ -450,15 +460,46 @@
         setStatus(`camera ← ${cleanHost(hostInput.value)}:8082`);
     }
 
-    talkBtn.addEventListener('click', startAudioLink);
-    listenBtn.addEventListener('click', stopAudioLink);
+    talkBtn.addEventListener('click', () => {
+        autoAudio = true;
+        localStorage.setItem('spacehandsAutoAudio', '1');
+        setAudioUi(audioLinkActive);
+        startAudioLink();
+    });
+    listenBtn.addEventListener('click', () => stopAudioLink(true));
+    autoAudioBtn.addEventListener('click', () => {
+        autoAudio = !autoAudio;
+        localStorage.setItem('spacehandsAutoAudio', autoAudio ? '1' : '0');
+        setAudioUi(audioLinkActive);
+        if (autoAudio) startAudioLink();
+        else stopAudioLink(true);
+    });
     window.addEventListener('keydown', (e) => {
         if (e.code === 'Space' && !e.repeat) {
             e.preventDefault();
-            audioLinkActive ? stopAudioLink() : startAudioLink();
+            audioLinkActive ? stopAudioLink(true) : startAudioLink();
         }
+    });
+
+    window.addEventListener('online', () => {
+        if (autoAudio) scheduleReconnect('network online');
+    });
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && autoAudio && !audioLinkActive) startAudioLink();
     });
 
     setAudioUi(false);
     connectCamera();
+
+    // Default audio to on. Browsers may require one click for microphone/audio
+    // permission; if autoplay is blocked the status will ask the operator to click
+    // start once, then reconnects are automatic after that.
+    setTimeout(() => {
+        if (autoAudio) {
+            startAudioLink().catch(err => {
+                console.warn('[webrtc] auto-start failed', err);
+                setStatus('click start 2-way audio to allow mic/speaker');
+            });
+        }
+    }, 600);
 })();

@@ -43,6 +43,7 @@ elif [ "$OS" = "Linux" ]; then
         ffmpeg \
         alsa-utils \
         pulseaudio-utils \
+        bluez \
         ghc \
         cabal-install \
         libjack-jackd2-dev \

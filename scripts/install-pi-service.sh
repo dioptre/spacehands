@@ -8,6 +8,8 @@ GROUP_NAME="$(id -gn "$USER_NAME" 2>/dev/null || echo "$USER_NAME")"
 SERVICE_NAME="spacehands-pi.service"
 SERVICE_PATH="/etc/systemd/system/$SERVICE_NAME"
 CONFIG_PATH="${CONFIG:-$ROOT/config.projector-pi.json}"
+PI_AUDIO_IN_VAL="${PI_AUDIO_IN:-default}"
+PI_AUDIO_OUT_VAL="${PI_AUDIO_OUT:-default}"
 
 if [ ! -d /run/systemd/system ]; then
   echo "ERROR: systemd does not appear to be running on this machine."
@@ -33,6 +35,8 @@ WorkingDirectory=$ROOT
 Environment=HOME=/home/$USER_NAME
 Environment=CONFIG=$CONFIG_PATH
 Environment=BUILD_JOBS=1
+Environment=PI_AUDIO_IN=$PI_AUDIO_IN_VAL
+Environment=PI_AUDIO_OUT=$PI_AUDIO_OUT_VAL
 ExecStart=$ROOT/scripts/run-pi-camera-stream.sh
 Restart=always
 RestartSec=3
