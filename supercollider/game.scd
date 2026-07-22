@@ -100,7 +100,7 @@ OSCdef(\reflex_tidal_forwarder, { |msg|
 
     isSilentCue = false;
     if (sName == "delaynote") { isSilentCue = true; };
-    if (["arpy", "cue", "delaynote", "sitar", "moog", "superpiano", "pluck", "juno", "latibro", "sid", "newnotes", "stab", "em2", "supermandolin"].includesEqual(sName)) {
+    if (["arpy", "cue", "delaynote", "sitar", "moog", "superpiano", "pluck", "juno", "latibro", "sid", "newnotes", "stab", "em2", "supermandolin", "superguitar"].includesEqual(sName)) {
         if (gainVal < 0.01) {
             isSilentCue = true;
         };

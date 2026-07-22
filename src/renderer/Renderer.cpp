@@ -898,7 +898,22 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
     if (state_ == VisualizerState::PLAYING) {
         for (const auto& spawn : spawns) {
             VisualizerNote note;
-            note.lane = std::clamp(spawn.type, 0, 9);
+            
+            // Map the raw midi note to the closest lane spatially (left-to-right)
+            static const int LANE_PITCHES[10] = { 50, 52, 54, 55, 57, 59, 60, 62, 64, 66 };
+            static const int SORTED_LANES[10] = { 0, 4, 7, 1, 9, 5, 8, 2, 6, 3 };
+            int closestDiff = 999;
+            int closestPitchIdx = 0;
+            int midiVal = spawn.midi;
+            for (int i = 0; i < 10; ++i) {
+                int diff = std::abs(LANE_PITCHES[i] - midiVal);
+                if (diff < closestDiff) {
+                    closestDiff = diff;
+                    closestPitchIdx = i;
+                }
+            }
+            note.lane = SORTED_LANES[closestPitchIdx];
+            
             note.hand = spawn.hand;
             note.progress = 0.0f;
             note.hit = false;

@@ -387,6 +387,7 @@ void OscSender::sendDirtPlay(int midi, float amp, float decay, const std::string
     lo_message_add_string(m, "delta");    lo_message_add_float(m, 0.5f);
     lo_message_add_string(m, "orbit");    lo_message_add_int32(m, orbit);
     lo_message_add_string(m, "s");        lo_message_add_string(m, instrument.c_str());
+    lo_message_add_string(m, "n");        lo_message_add_float(m, (float)(midi - 60));
     lo_message_add_string(m, "note");     lo_message_add_float(m, (float)(midi - 60));
     lo_message_add_string(m, "gain");     lo_message_add_float(m, amp);
     lo_message_add_string(m, "sustain");  lo_message_add_float(m, decay * 1.5f); // longer decay for warm tail
