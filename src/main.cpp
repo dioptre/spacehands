@@ -2,6 +2,8 @@
 #include <chrono>
 #include <csignal>
 #include <iostream>
+#include <cstdlib>
+#include <ctime>
 #include <memory>
 #include <string>
 #include <thread>
@@ -48,6 +50,7 @@ struct Frame {
 };
 
 int main(int argc, char* argv[]) {
+    std::srand(std::time(nullptr));
     std::string config_path = "config.json";
     for (int i = 1; i < argc - 1; ++i)
         if (std::string(argv[i]) == "--config") config_path = argv[i+1];

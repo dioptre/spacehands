@@ -93,6 +93,7 @@ private:
     int score_ = 0;
     int combo_ = 0;
     int maxCombo_ = 0;
+    std::string currentInstrument_ = "superpiano";
 
     enum class FadeState { NONE, FADE_OUT, FADE_IN };
     FadeState fadeState_ = FadeState::NONE;

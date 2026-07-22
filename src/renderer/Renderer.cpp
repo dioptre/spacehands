@@ -12,6 +12,45 @@
 #define M_PI 3.14159265358979323846f
 #endif
 
+static const std::string SONG_PATTERNS[30] = {
+    "<[~@2 b4 a4@2 b4@2 g4] [~@2 b4 g4 a4 b4 ~@2] [~@2 b4 a4@2 b4@2 g4] [~@2 d5 b4@2 a4 ~@2] [~ b4@2 a4@2 g4@2 ~] [g4@2 b4 d5@2 b4@2 g4] [a4@2 c5 b4@2 a4@2 fs4] [g4@2 a4 b4@2 d5@2 ~]>", // Here Comes The Sun
+    "<[e5@2 e5 g5@2 e5@2 d5] c5@2 b4@4 [e5@2 e5 g5@2 e5@2 d5] c5 d5 c5 b4@2>", // Seven Nation Army
+    "<[g4 b4 c5 ~] [g4 b4 db5 c5] [g4 b4 c5 b4 g4 ~] ~>", // Smoke on the Water
+    "<[b4 b4 c5 d5] [d5 c5 b4 a4] [g4 g4 a4 b4] [b4@1.5 a4@0.5 a4@2] [b4 b4 c5 d5] [d5 c5 b4 a4] [g4 g4 a4 b4] [a4@1.5 g4@0.5 g4@2]>", // Ode to Joy
+    "<[c4 c4 g4 g4] [a4 a4 g4@2] [f4 f4 e4 e4] [d4 d4 c4@2] [g4 g4 f4 f4] [e4 e4 d4@2] [g4 g4 f4 f4] [e4 e4 d4@2]>", // Twinkle Twinkle
+    "<c5 b4@1.5 a4@0.5 g4@2 f4 e4 d4 c4 g4@1.5 a4@0.5 a4@2 b4@1.5 c5@0.5 c5@2>", // Joy to the World
+    "<[c4 d4 e4 c4] [c4 d4 e4 c4] [e4 f4 g4@2] [e4 f4 g4@2] [[g4@0.5 a4@0.5 g4@0.5 f4@0.5] e4 c4] [[g4@0.5 a4@0.5 g4@0.5 f4@0.5] e4 c4] [c4 g3 c4@2] [c4 g3 c4@2]>", // Frere Jacques
+    "<[e4 d4 c4 d4] [e4 e4 e4@2] [d4 d4 d4@2] [e4 g4 g4@2] [e4 d4 c4 d4] [e4 e4 e4 e4] [d4 d4 e4 d4] c4@4>", // Mary Had a Little Lamb
+    "<[g4 g4 g4 eb4@1.5 bb4@0.5] [g4 eb4@1.5 bb4@0.5 g4@2] [d5 d5 d5 eb5@1.5 bb4@0.5] [fs4 eb4@1.5 bb4@0.5 g4@2]>", // Imperial March
+    "<[fs4@1.5 a4@1.5 fs4@1 fs4@0.5 b4 fs4 e4] [fs4@1.5 cs5@1.5 fs4@1 fs4@0.5 d5 cs5 a4] [fs4 cs5 fs5 fs4@0.5 e4 e4 cs4 gs4 fs4@2]>", // Axel F
+    "<[e5 e5 ~ e5] [~ c5 e5 ~] [g5 ~ ~ ~] [g4 ~ ~ ~] [c5 ~ ~ g4] [~ ~ e4 ~] [~ a4 ~ b4] [~ bb4 a4 ~]>", // Mario
+    "<[e4 a4 b4 c5] [a4@2 ~ e4 a4 b4 c5] [a4@2 ~ e4 a4 b4 c5] [b4 a4 c5 b4 a4 e5] [e5@2 ~ e5 d5 e5 f5] [f5@2 ~ f5 e5 d5 f5] [e5@2 ~ e5 d5 c5 b4] [e4@2 b4 a4@2]>", // Bella Ciao
+    "<[e5 b4 c5 d5] [c5@0.5 b4@0.5 a4@2 c5] [e5 d5 c5 b4] [c5@1.5 d5@0.5 e5@2 c5] [a4 a4 ~ ~] [d5@1.5 f5@0.5 a5 g5] [f5 c5@1.5 e5 d5] [c5 b4 c5 d5] [e5 c5 a4 a4]>", // Tetris
+    "<[c4 c4 c4@1.5 d4@0.5 e4] [e4@1.5 d4@0.5 e4@1.5 f4@0.5 g4@2] [[c5@0.33 c5@0.33 c5@0.33] [g4@0.33 g4@0.33 g4@0.33] [e4@0.33 e4@0.33 e4@0.33] [c4@0.33 c4@0.33 c4@0.33]] [g4@1.5 f4@0.5 e4@1.5 d4@0.5 c4@2]>", // Row Your Boat
+    "<[c4@1.5 d4@0.5 e4 g4] [e4@1.5 c4@0.5 c4@2] [c4@1.5 d4@0.5 e4 c4] [g4@2 e4@2] [c4@1.5 d4@0.5 e4 g4] [e4@1.5 c4@0.5 a4@2] [d4@2 f4@2] [e4@1.5 d4@0.5 c4@2]>", // Pop Goes the Weasel
+    "<[e5 ds5 e5 ds5 e5 b4 d5 c5] a4@4 [c4 e4 a4 b4] e4@4 [e4 gs4 b4 c5] e4@4>", // Fur Elise
+    "<[e4 e4 e4@2] [e4 e4 e4@2] [e4 g4 c4@1.5 d4@0.5] e4@4 [f4 f4 f4@1.5 f4@0.5] [f4 e4 e4@0.5 e4@0.5] [e4 d4 d4 e4] d4@2 g4@2>", // Jingle Bells
+    "<[g4 f4@3] [~ a4 b4 cs5 d5 e5 f5] [e5@2 d5@4] [d5 c5 c5 b4 a4 g4] [bb4 a4 a4@2] [g4 f4 a4 g4@2 d4] f4@4>", // Yesterday
+    "<[d4 d5 a4 g4 g5 a4 fs5 a4] [d4 d5 a4 g4 g5 a4 fs5 a4] [e4 d5 a4 g4 g5 a4 fs5 a4] [g4 d5 a4 g4 g5 a4 fs5 a4]>", // Sweet Child O Mine
+    "<[fs4 fs4 d4 b3 b3 e4 e4 e4] [g4 g4 g4 fs4 fs4 e4 d4 cs4] [fs4 fs4 d4 b3 b3 e4 e4 e4] [g4 g4 g4 fs4 fs4 e4 d4 cs4]>", // Take On Me
+    "<[d4 d4 d5 a4@2 gs4 g4 f4 d4 f4 g4] [c4 c4 d5 a4@2 gs4 g4 f4 d4 f4 g4] [b3 b3 d5 a4@2 gs4 g4 f4 d4 f4 g4] [bb3 bb3 d5 a4@2 gs4 g4 f4 d4 f4 g4]>", // Megalovania
+    "<[b3 c4 d4 e4] [fs4 d4 fs4@2] [f4 db4 f4@2] [e4 c4 e4@2] [b3 c4 d4 e4] [fs4 d4 fs4 b4] [a4 fs4 d4 fs4] a4@4>", // Mountain King
+    "<[g4 g4 bb4 c5 d5 ~ c5 bb4] [g4 g4 bb4 c5 f5 ~ eb5 d5] [g4 g4 bb4 c5 d5 ~ c5 bb4] [c5@2 d5@2 g4@4]>", // Gotta Go Fast
+    "<[g4 g4 bb4@1.5 c5@1.5] [g4 g4 f4@1.5 fs4@1.5] [g4 g4 bb4@1.5 c5@1.5] [g4 g4 f4@1.5 fs4@1.5] [bb4 a4 g4@4]>", // Mission Impossible
+    "<[c4 e4 g4 b4 c5 e5 g5 b5] [a5 f5 c5 a4 f4 c4 a3 f3] [c4 e4 g4 b4 c5 e5 g5 b5] [a5 f5 c5 a4 f4 c4 a3 f3]>", // FF Prelude
+    "<[c4 d4 e4 c4 a4] [g4 g4 c4 d4 e4 c4] f4@4 [d4 e4 f4 d4 b4] [c5 c5 d4 e4 f4 d4] e4@4>", // Under the Sea
+    "<[c4@1.5 d4@0.5 e4@1.5 c4@0.5] [e4 c4 e4@2] [d4@1.5 e4@0.5 f4@1.5 f4@0.5] [a4 g4 f4 d4] [e4@1.5 f4@0.5 g4@1.5 e4@0.5] [g4 e4 g4@2] [f4@1.5 g4@0.5 a4@1.5 a4@0.5] [b4 a4 g4 f4]>", // Do-Re-Mi
+    "<[e5@1.5 ds5@0.5 e5@0.5 f5@0.5 g5@2] [f5 e5 d5 c5] [b4@1.5 a4@0.5 b4@0.5 c5@0.5 d5@2] [c5 b4 a4 g4] [e5@1.5 ds5@0.5 e5@0.5 f5@0.5 g5@2] [f5 e5 d5 c5] [b4@1.5 a4@0.5 b4@0.5 c5@0.5 d5@2] [c5 b4 a4 g4]>", // Spring
+    "<[ds4@0.5 e4@1.5 fs4@0.5 g4@2] [ds4@0.5 e4@0.5 fs4@0.5 g4@0.5 c5@0.5 b4@0.5 e4@0.5 g4@0.5 b4@2] [bb4@4]>", // Pink Panther
+    "<f4@2 [ab4@3 bb4@1 c5@2] [d5@1.5 eb5@0.5 d5@1 c5@2 ab4@1] [f4@1.5 g4@0.5 f4@1 d4@2 b3@1] [g3@1.5 a3@0.5 b3@1 c4@2]>" // Greensleeves
+};
+
+static const std::string INSTRUMENTS[3] = {
+    "supermandolin",
+    "sitar",
+    "superpiano"
+};
+
 // Cube mesh data with normals
 static const float cubeVertices[] = {
     // positions          // normals
@@ -851,7 +890,14 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
                 osc_->sendTidalCtrl("reflex_active", 1.0f);
                 osc_->sendTidalCtrl("reflex_song_6", 1.0f);
                 osc_->sendTidalCtrl("reflex_cps", 0.3f);
-                osc_->sendTidalCtrlStr("reflex_notes", "<[~@2 b4 a4@2 b4@2 g4] [~@2 b4 g4 a4 b4 ~@2] [~@2 b4 a4@2 b4@2 g4] [~@2 d5 b4@2 a4 ~@2] [~ b4@2 a4@2 g4@2 ~] [g4@2 b4 d5@2 b4@2 g4] [a4@2 c5 b4@2 a4@2 fs4] [g4@2 a4 b4@2 d5@2 ~]>");
+
+                // Select a random song pattern and instrument
+                int songIdx = rand() % 30;
+                int instIdx = rand() % 3;
+                currentInstrument_ = INSTRUMENTS[instIdx];
+                std::cout << "[Reflex] Selected Song #" << (songIdx + 1) << " played on " << currentInstrument_ << "\n";
+                osc_->sendTidalCtrlStr("reflex_notes", SONG_PATTERNS[songIdx].c_str());
+
                 osc_->sendMuteBacking(false);
             }
         }
@@ -1102,7 +1148,7 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
                         
                         if (osc_) {
                             if (it->playCustom) {
-                                osc_->sendDirtPlay(it->midi, it->gain, it->sustain, it->instrument, 0);
+                                osc_->sendDirtPlay(it->midi, it->gain, it->sustain, currentInstrument_, 0);
                             } else if (osc_->getActiveSong() == 6) {
                                 // Map target's visual lane directly to the correct G Major diatonic vocal note pitch!
                                 int midi = 55; // Fallback G4
