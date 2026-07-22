@@ -796,19 +796,27 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
         notes_.push_back(note);
     }
 
-    // Fallback beat spawner (spawns automatic notes at ~100 BPM if GHCi is idle)
+    // Fallback beat spawner (only active if no OSC spawns received in the last 3.0 seconds)
+    static float lastOscTime = 999.0f;
+    if (!spawns.empty()) {
+        lastOscTime = 0.0f;
+    } else {
+        lastOscTime += dt;
+    }
+
     static float spawnTimer = 0.0f;
-    spawnTimer += dt;
-    if (spawnTimer >= 0.6f) {
-        spawnTimer = 0.0f;
-        // 60% chance to spawn a note
-        if (rand() % 100 < 60) {
-            VisualizerNote note;
-            note.lane = rand() % 4;
-            note.hand = rand() % 2;
-            note.progress = 0.0f;
-            note.hit = false;
-            notes_.push_back(note);
+    if (lastOscTime > 3.0f) {
+        spawnTimer += dt;
+        if (spawnTimer >= 0.5f) { // 120 BPM for high-density mock gameplay
+            spawnTimer = 0.0f;
+            if (rand() % 100 < 75) {
+                VisualizerNote note;
+                note.lane = rand() % 4;
+                note.hand = rand() % 2;
+                note.progress = 0.0f;
+                note.hit = false;
+                notes_.push_back(note);
+            }
         }
     }
 
