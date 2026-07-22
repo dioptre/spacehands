@@ -44,7 +44,7 @@ public:
     ~Renderer();
 
     bool init(int width, int height, bool fullscreen, OscSender& osc, const Config& cfg);
-    void render(const HandList& hands, float dt);
+    void render(const HandList& hands, const std::vector<TargetSpawn>& spawns, float dt);
     void close();
     bool shouldClose() const;
     const std::vector<int>& getSequence() const { return sequence_; }
@@ -76,6 +76,18 @@ private:
     glm::vec3 frozenHandPos_{0.0f};
     bool hasFrozenHand_ = false;
     bool hasSeenPreview_ = false;
+    
+    struct VisualizerNote {
+        glm::vec3 pos;
+        float progress = 0.0f; // 0.0 to 1.2 (1.0 is hit target)
+        int lane = 0;          // 0: UL, 1: UR, 2: LL, 3: LR
+        int hand = 0;          // 0 or 1
+        bool hit = false;
+    };
+    std::vector<VisualizerNote> notes_;
+    int score_ = 0;
+    int combo_ = 0;
+    int maxCombo_ = 0;
 
     enum class FadeState { NONE, FADE_OUT, FADE_IN };
     FadeState fadeState_ = FadeState::NONE;

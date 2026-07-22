@@ -5,14 +5,7 @@
 #include <functional>
 #include <mutex>
 #include <vector>
-
-struct TargetSpawn {
-    float x;
-    float y;
-    float z;
-    int type;
-    int hand;
-};
+#include "../Types.h"
 
 class OscReceiver {
 public:

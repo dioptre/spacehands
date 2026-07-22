@@ -719,14 +719,17 @@ glm::vec3 Renderer::handWorldPos(float hx, float hy, float hz, float aspect) {
 void Renderer::burstParticles(const glm::vec3& pos) {
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_real_distribution<float> velDis(-2.0f, 2.0f);
-    for (int i = 0; i < 30; i++) {
+    std::uniform_real_distribution<float> velX(-1.5f, 1.5f);
+    std::uniform_real_distribution<float> velY(2.5f, 6.0f); // upward sparks!
+    std::uniform_real_distribution<float> velZ(-1.5f, 1.5f);
+    for (int i = 0; i < 25; i++) {
         VisualizerParticle p;
         p.pos = pos;
-        p.vel = glm::vec3(velDis(gen), velDis(gen), velDis(gen));
+        p.vel = glm::vec3(velX(gen), velY(gen), velZ(gen));
         p.life = 1.0f;
         particles_.push_back(p);
     }
+
 }
 
 void Renderer::updateCellVisuals(int i, glm::vec3& color, glm::vec3& emissive, float& opacity, float& scale, bool& drawWireframe) {
@@ -782,18 +785,34 @@ void Renderer::updateCellVisuals(int i, glm::vec3& color, glm::vec3& emissive, f
     }
 }
 
-void Renderer::render(const HandList& hands, float dt) {
-    if (!window_) return;
-
-    if (osc_) {
-        int target = -1;
-        if (state_ == VisualizerState::PLAYING && collected_ >= 0 && collected_ < (int)sequence_.size()) {
-            target = sequence_[collected_];
-        }
-        osc_->setTargetNode(target);
+void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spawns, float dt) {
+    // Process new spawns from GHCi
+    for (const auto& spawn : spawns) {
+        VisualizerNote note;
+        note.lane = spawn.type % 4;
+        note.hand = spawn.hand;
+        note.progress = 0.0f;
+        note.hit = false;
+        notes_.push_back(note);
     }
 
-    // Window size might change
+    // Fallback beat spawner (spawns automatic notes at ~100 BPM if GHCi is idle)
+    static float spawnTimer = 0.0f;
+    spawnTimer += dt;
+    if (spawnTimer >= 0.6f) {
+        spawnTimer = 0.0f;
+        // 60% chance to spawn a note
+        if (rand() % 100 < 60) {
+            VisualizerNote note;
+            note.lane = rand() % 4;
+            note.hand = rand() % 2;
+            note.progress = 0.0f;
+            note.hit = false;
+            notes_.push_back(note);
+        }
+    }
+
+    // Window size update
     glfwGetWindowSize(window_, &width_, &height_);
     int fbWidth, fbHeight;
     glfwGetFramebufferSize(window_, &fbWidth, &fbHeight);
@@ -801,13 +820,11 @@ void Renderer::render(const HandList& hands, float dt) {
 
     float aspect = (float)width_ / (float)height_;
 
-    // Handle background clear
-    float clearRamp = (state_ == VisualizerState::CLIMAX) ? std::min(climaxTimer_ / 3.5f, 1.0f) : 0.0f;
-    if (state_ == VisualizerState::CONGRATULATIONS) clearRamp = 1.0f;
-    glClearColor(0.0f, 0.0f, 0.03f * (1.0f - clearRamp), 1.0f);
+    // Deep space dark background clear
+    glClearColor(0.01f, 0.01f, 0.04f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // Matrix calculations
+    // Matrices
     glm::mat4 projection = glm::perspective(glm::radians(55.0f), aspect, 0.01f, 100.0f);
     glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 0.5f, 4.5f), glm::vec3(0.0f, 0.5f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
@@ -819,261 +836,202 @@ void Renderer::render(const HandList& hands, float dt) {
     glUniformMatrix4fv(glGetUniformLocation(starfieldShader_, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
     glUniformMatrix4fv(glGetUniformLocation(starfieldShader_, "view"), 1, GL_FALSE, glm::value_ptr(view));
 
-    // Update game logic states
-    updateGridPositions(dt);
-
-    sequenceAge_ += dt;
-    if (sequenceAge_ >= 180.0f && state_ == VisualizerState::IDLE && hands.empty()) {
-        resetGame();
-        sequenceAge_ = 0.0f;
-    }
-
-    // Update fade timer and handle phase transition
-    float fadeOpacity = 0.0f;
-    if (fadeState_ == FadeState::FADE_OUT) {
-        fadeTimer_ += dt;
-        fadeOpacity = std::min(fadeTimer_ / 0.5f, 1.0f);
-        if (fadeTimer_ >= 0.5f) {
-            resetGame(); // resets state_ to IDLE
-            fadeState_ = FadeState::FADE_IN;
-            fadeTimer_ = 0.0f;
-        }
-    } else if (fadeState_ == FadeState::FADE_IN) {
-        fadeTimer_ += dt;
-        fadeOpacity = 1.0f - std::min(fadeTimer_ / 0.5f, 1.0f);
-        if (fadeTimer_ >= 0.5f) {
-            fadeState_ = FadeState::NONE;
-            fadeTimer_ = 0.0f;
-        }
-    }
-
-    // State Machine
-    if (state_ == VisualizerState::IDLE) {
-        if (!hands.empty()) {
-            if (glfwGetTime() - lastPreviewTime_ >= 40.0f) {
-                state_ = VisualizerState::SEQUENCE_PREVIEW;
-                previewStep_ = 0;
-                previewTimer_ = -1.0f; // 1s initial mute delay
-                osc_->setPreviewMute(true); // mute hand instruments during preview
-            } else {
-                state_ = VisualizerState::PLAYING;
-            }
-            idleTimer_ = 0.0f;
-        }
-        idleTimer_ += dt;
-    } 
-    else if (state_ == VisualizerState::SEQUENCE_PREVIEW) {
-        previewTimer_ += dt;
-        
-        if (previewTimer_ >= 0.0f) {
-            if (previewStep_ < 6) {
-                float targetTime = previewStep_ * 0.7f;
-                if (previewTimer_ >= targetTime) {
-                    int noteIdx = sequence_[previewStep_];
-                    osc_->sendDirtPlay(PENTA[noteIdx], 0.75f, 0.4f);
-                    previewStep_++;
-                }
-            }
-            if (previewTimer_ >= 6 * 0.7f) {
-                hasSeenPreview_ = true;
-                lastPreviewTime_ = glfwGetTime();
-                state_ = VisualizerState::PLAYING;
-                osc_->setPreviewMute(false); // unmute hand instruments for gameplay
-            }
-        }
-    } 
-    else if (state_ == VisualizerState::PLAYING) {
-        if (hands.empty()) {
-            idleTimer_ += dt;
-            if (idleTimer_ > 8.0f) {
-                resetGame();
-            }
-        } else {
-            idleTimer_ = 0.0f;
-        }
-
-        // Touch detection
-        if (collected_ < 6) {
-            int targetNodeIdx = sequence_[collected_];
-            glm::vec3 targetPos = gridPositions_[targetNodeIdx];
-            bool touching = false;
-
-            for (const auto& h : hands) {
-                float mx = cfg_->mirror_x ? (1.0f - h.x) : h.x;
-                int gesture = (int)h.gesture;
-
-                if (gesture == 7) { // THUMBS_DOWN (skip note)
-                    collected_++;
-                    updateMelody();
-                    holdTimer_ = 0.0f;
-                    break;
-                }
-
-                glm::vec3 handPos;
-                if (gesture == 2) { // FIST
-                    if (!hasFrozenHand_) {
-                        frozenHandPos_ = handWorldPos(mx, h.y, h.z, aspect);
-                        hasFrozenHand_ = true;
-                    }
-                    handPos = frozenHandPos_;
-                } else {
-                    hasFrozenHand_ = false;
-                    handPos = handWorldPos(mx, h.y, h.z, aspect);
-                }
-
-                float radiusMult = 1.0f;
-                if (gesture == 3) radiusMult = 0.5f;
-                if (gesture == 5) radiusMult = 1.5f;
-
-                float dx = std::abs(handPos.x - targetPos.x);
-                float dy = std::abs(handPos.y - targetPos.y);
-                float dz = std::abs(handPos.z - targetPos.z);
-
-                if (dx < 0.9f * radiusMult && dy < 0.9f * radiusMult && dz < 0.8f * 2.0f) {
-                    touching = true;
-                    if (gesture == 3) {
-                        holdTimer_ = 1.0f;
-                    }
-                }
-            }
-
-            if (touching) {
-                holdTimer_ += dt / 0.6f;
-            } else {
-                holdTimer_ = std::max(0.0f, holdTimer_ - dt * 2.0f);
-            }
-
-            if (holdTimer_ >= 1.0f) {
-                int collectedMidi = PENTA[targetNodeIdx];
-                burstParticles(targetPos);
-                osc_->sendDirtPlay(collectedMidi, 0.8f, 0.4f);
-                osc_->sendTidalCtrl("transformation_note", (float)collectedMidi);
-                collected_++;
-                holdTimer_ = 0.0f;
-                updateMelody();
-
-                if (collected_ >= 6) {
-                    state_ = VisualizerState::CLIMAX;
-                    climaxTimer_ = 0.0f;
-                    osc_->sendTidalCtrl("transformation_climax", 1.0f);
-                }
-            }
-        }
-    } 
-    else if (state_ == VisualizerState::CLIMAX) {
-        climaxTimer_ += dt;
-        if (climaxTimer_ > 3.5f) {
-            state_ = VisualizerState::CONGRATULATIONS;
-            congratsTimer_ = 0.0f;
-        }
-    } 
-    else if (state_ == VisualizerState::CONGRATULATIONS) {
-        if (fadeState_ != FadeState::FADE_OUT) {
-            congratsTimer_ += dt;
-            if (congratsTimer_ > 15.0f) {
-                fadeState_ = FadeState::FADE_OUT;
-                fadeTimer_ = 0.0f;
-            }
-        }
-    }
-
-    // Render Starfield
+    // Render Starfield background (cosmic space dust)
     glUseProgram(starfieldShader_);
-    glm::mat4 starModel = glm::rotate(glm::mat4(1.0f), (float)glfwGetTime() * 0.005f, glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::mat4 starModel = glm::rotate(glm::mat4(1.0f), (float)glfwGetTime() * 0.015f, glm::vec3(0.0f, 1.0f, 0.0f));
     glUniformMatrix4fv(glGetUniformLocation(starfieldShader_, "model"), 1, GL_FALSE, glm::value_ptr(starModel));
-    glUniform3f(glGetUniformLocation(starfieldShader_, "color"), 0.53f, 0.33f, 1.0f);
-    glUniform1f(glGetUniformLocation(starfieldShader_, "opacity"), 0.8f);
-
+    glUniform3f(glGetUniformLocation(starfieldShader_, "color"), 0.2f, 0.5f, 0.9f);
+    glUniform1f(glGetUniformLocation(starfieldShader_, "opacity"), 0.6f);
     glBindVertexArray(starfieldVAO_);
     glDrawArrays(GL_POINTS, 0, 4000);
 
-    // Render Nodes (if not in CLIMAX / CONGRATS)
-    if (state_ != VisualizerState::CLIMAX && state_ != VisualizerState::CONGRATULATIONS) {
-        for (int i = 0; i < NUM_NODES; i++) {
-            glm::vec3 cellColor, emissiveColor;
-            float opacity, scale;
-            bool drawWireframe;
-            updateCellVisuals(i, cellColor, emissiveColor, opacity, scale, drawWireframe);
+    // Guitar Hero Sloped Fretboard Geometry definition (directly in 3D world space)
+    float horizonZ = -10.0f;
+    float horizonY = 1.0f;
+    std::array<float, 4> horizonX = {-0.3f, -0.1f, 0.1f, 0.3f};
 
-            if (state_ == VisualizerState::SEQUENCE_PREVIEW) {
-                if (previewTimer_ < 0.0f) {
-                    // Delay phase: keep all cells dimmed
-                    cellColor = glm::vec3(0.0f, 0.06f, 0.13f);
-                    emissiveColor = glm::vec3(0.0f);
-                    opacity = 0.15f;
-                } else {
-                    int activeStep = previewStep_ > 0 ? previewStep_ - 1 : 0;
-                    int previewNode = sequence_[activeStep];
-                    if (i == previewNode) {
-                        cellColor = glm::vec3(1.0f, 1.0f, 1.0f);
-                        emissiveColor = glm::vec3(0.4f, 0.2f, 1.0f);
-                        opacity = 1.0f;
-                        scale = 1.2f + 0.08f * std::sin(glfwGetTime() * 8.0f);
-                    } else if (cfg_->show_preview_history && std::find(sequence_.begin(), sequence_.begin() + activeStep, i) != sequence_.begin() + activeStep) {
-                        cellColor = glm::vec3(0.06f, 0.13f, 0.26f);
-                        emissiveColor = glm::vec3(0.0f);
-                        opacity = 0.35f;
-                    } else {
-                        cellColor = glm::vec3(0.0f, 0.06f, 0.13f);
-                        emissiveColor = glm::vec3(0.0f);
-                        opacity = 0.15f;
+    float foregroundZ = 0.0f;
+    float foregroundY = -0.8f;
+    std::array<float, 4> foregroundX = {-1.5f, -0.5f, 0.5f, 1.5f};
+
+    std::array<glm::vec3, 4> receptors = {
+        glm::vec3(foregroundX[0], foregroundY, foregroundZ),
+        glm::vec3(foregroundX[1], foregroundY, foregroundZ),
+        glm::vec3(foregroundX[2], foregroundY, foregroundZ),
+        glm::vec3(foregroundX[3], foregroundY, foregroundZ)
+    };
+
+    std::array<glm::vec3, 4> laneColors = {
+        glm::vec3(0.1f, 0.95f, 0.2f),  // Lane 0: Green
+        glm::vec3(1.0f, 0.15f, 0.15f), // Lane 1: Red
+        glm::vec3(1.0f, 0.85f, 0.05f), // Lane 2: Yellow
+        glm::vec3(0.15f, 0.55f, 1.0f)  // Lane 3: Blue
+    };
+
+    // Helper: draw flat ring lying in XZ plane
+    auto drawFlatRing = [&](const glm::vec3& center, float radius, const glm::vec3& color, float opacity) {
+        std::vector<float> lineVerts;
+        int segments = 64;
+        for (int i = 0; i <= segments; i++) {
+            float theta = 2.0f * M_PI * float(i) / float(segments);
+            lineVerts.push_back(center.x + radius * std::cos(theta));
+            lineVerts.push_back(center.y);
+            lineVerts.push_back(center.z + radius * std::sin(theta));
+        }
+
+        glUseProgram(starfieldShader_);
+        glUniformMatrix4fv(glGetUniformLocation(starfieldShader_, "model"), 1, GL_FALSE, glm::value_ptr(glm::mat4(1.0f)));
+        glUniform3fv(glGetUniformLocation(starfieldShader_, "color"), 1, glm::value_ptr(color));
+        glUniform1f(glGetUniformLocation(starfieldShader_, "opacity"), opacity);
+
+        glBindVertexArray(lineVAO_);
+        glBindBuffer(GL_ARRAY_BUFFER, lineVBO_);
+        glBufferData(GL_ARRAY_BUFFER, lineVerts.size() * sizeof(float), lineVerts.data(), GL_DYNAMIC_DRAW);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
+
+        glDrawArrays(GL_LINE_STRIP, 0, segments + 1);
+    };
+
+    // Draw sloped Guitar Hero Fretboard highway lines
+    glUseProgram(flatShader_);
+    glUniform1f(glGetUniformLocation(flatShader_, "u_opacity"), 0.25f);
+    
+    std::vector<float> boardVerts;
+    // Borders
+    boardVerts.push_back(-0.4f); boardVerts.push_back(horizonY); boardVerts.push_back(horizonZ);
+    boardVerts.push_back(-2.0f); boardVerts.push_back(foregroundY); boardVerts.push_back(foregroundZ);
+
+    boardVerts.push_back(0.4f); boardVerts.push_back(horizonY); boardVerts.push_back(horizonZ);
+    boardVerts.push_back(2.0f); boardVerts.push_back(foregroundY); boardVerts.push_back(foregroundZ);
+
+    // Lane dividers
+    for (int i = 1; i < 4; i++) {
+        float lx_start = glm::mix(-0.4f, 0.4f, i / 4.0f);
+        float lx_end = glm::mix(-2.0f, 2.0f, i / 4.0f);
+        boardVerts.push_back(lx_start); boardVerts.push_back(horizonY); boardVerts.push_back(horizonZ);
+        boardVerts.push_back(lx_end); boardVerts.push_back(foregroundY); boardVerts.push_back(foregroundZ);
+    }
+
+    // Scrolling Fret lines
+    float fretPhase = glm::fract(glfwGetTime() * 0.4f);
+    for (int i = 0; i < 8; i++) {
+        float ft = glm::fract(fretPhase + (float)i / 8.0f);
+        float fz = glm::mix(horizonZ, foregroundZ, ft);
+        float fy = glm::mix(horizonY, foregroundY, ft);
+        float fx_left = glm::mix(-0.4f, -2.0f, ft);
+        float fx_right = glm::mix(0.4f, 2.0f, ft);
+        boardVerts.push_back(fx_left); boardVerts.push_back(fy); boardVerts.push_back(fz);
+        boardVerts.push_back(fx_right); boardVerts.push_back(fy); boardVerts.push_back(fz);
+    }
+
+    GLuint boardVAO, boardVBO;
+    glGenVertexArrays(1, &boardVAO);
+    glGenBuffers(1, &boardVBO);
+    glBindVertexArray(boardVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, boardVBO);
+    glBufferData(GL_ARRAY_BUFFER, boardVerts.size() * sizeof(float), boardVerts.data(), GL_STREAM_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glDrawArrays(GL_LINES, 0, boardVerts.size() / 3);
+    glDeleteBuffers(1, &boardVBO);
+    glDeleteVertexArrays(1, &boardVAO);
+
+    // Static variables for receptor hit flames
+    static std::array<float, 4> flameIntensity = {0.0f, 0.0f, 0.0f, 0.0f};
+
+    // Update active notes, check collision, and trigger sparks/flames on hit
+    for (auto it = notes_.begin(); it != notes_.end(); ) {
+        it->progress += dt / 2.0f; // notes travel down highway in 2.0 seconds
+
+        // Interpolate note position down the lane slope
+        float t = std::min(it->progress, 1.2f);
+        float nx = glm::mix(horizonX[it->lane], foregroundX[it->lane], t);
+        float ny = glm::mix(horizonY, foregroundY, t);
+        float nz = glm::mix(horizonZ, foregroundZ, t);
+        it->pos = glm::vec3(nx, ny, nz);
+
+        // Check hand intersection when note crosses the receptor plane (progress around 1.0)
+        if (std::abs(it->progress - 1.0f) < 0.15f && !it->hit) {
+            for (const auto& h : hands) {
+                float mx = cfg_->mirror_x ? (1.0f - h.x) : h.x;
+                glm::vec3 handPos = handWorldPos(mx, h.y, h.z, aspect);
+                
+                // Check if hand is near the corresponding lane receptor
+                float dx = std::abs(handPos.x - receptors[it->lane].x);
+                float dy = std::abs(handPos.y - receptors[it->lane].y);
+                if (dx < 0.7f && dy < 0.6f) {
+                    it->hit = true;
+                    combo_++;
+                    score_ += 100 * combo_;
+                    
+                    // Activate flame visual feedback
+                    flameIntensity[it->lane] = 1.0f;
+                    burstParticles(receptors[it->lane]);
+                    
+                    // Send OSC play command to trigger hardware hit sound
+                    if (osc_) {
+                        osc_->sendDirtPlay(PENTA[it->lane * 3 % 12], 0.85f, 0.45f);
                     }
+                    break;
                 }
             }
+        }
 
-            glm::mat4 model = glm::mat4(1.0f);
-            model = glm::translate(model, gridPositions_[i]);
-            model = glm::scale(model, glm::vec3(0.8f * scale));
-
-            drawCube(model, cellColor, emissiveColor, opacity, false);
-
-            if (drawWireframe) {
-                int activeStep = previewStep_ > 0 ? previewStep_ - 1 : 0;
-                glm::vec3 wireColor = (state_ == VisualizerState::SEQUENCE_PREVIEW && previewTimer_ >= 0.0f && i == sequence_[activeStep]) 
-                    ? glm::vec3(1.0f) : glm::vec3(0.2f, 0.4f, 1.0f);
-                drawCube(model, glm::vec3(0.0f), wireColor, opacity * 0.8f, true);
+        // Erase note if it goes too far past the hit window
+        if (it->progress > 1.2f) {
+            if (!it->hit) {
+                combo_ = 0; // miss resets combo
             }
-
-            // Draw alien model if loaded and node is not collected
-            auto it = std::find(sequence_.begin(), sequence_.end(), i);
-            int seqPos = (it != sequence_.end()) ? std::distance(sequence_.begin(), it) : -1;
-            bool isCollected = (seqPos != -1 && seqPos < collected_);
-
-            if (hasAlienModel_ && !isCollected) {
-                glm::mat4 alienModelMat = glm::mat4(1.0f);
-                float bob = 0.55f + 0.08f * std::sin(glfwGetTime() * 1.2f + i * 0.8f);
-                glm::vec3 alienPos = gridPositions_[i] + glm::vec3(0.0f, bob, 0.0f);
-                alienModelMat = glm::translate(alienModelMat, alienPos);
-                alienModelMat = glm::rotate(alienModelMat, (float)glfwGetTime() * 0.48f + i * 0.5f, glm::vec3(0.0f, 1.0f, 0.0f));
-                alienModelMat = glm::scale(alienModelMat, glm::vec3(0.35f * scale));
-
-                glm::vec3 alienColor = glm::vec3(0.7f, 0.9f, 1.0f);
-                glm::vec3 alienEmissive = emissiveColor * 0.5f + glm::vec3(0.1f, 0.2f, 0.4f);
-                drawModel(alienModel_, alienModelMat, alienColor, alienEmissive, opacity);
-            }
+            it = notes_.erase(it);
+        } else {
+            ++it;
         }
     }
 
-    // Render Hold Ring
-    if (state_ == VisualizerState::PLAYING && holdTimer_ > 0.0f && collected_ < 6) {
-        int targetNodeIdx = sequence_[collected_];
-        glm::vec3 targetPos = gridPositions_[targetNodeIdx];
-        float radius = (holdTimer_ * 1.2f + 0.8f) * 0.55f;
-        drawRing(targetPos, radius, glm::vec3(1.0f, 1.0f, 1.0f), 0.8f);
+    // Draw Receptors (flat rings at the bottom of the highway)
+    for (int i = 0; i < 4; i++) {
+        glm::vec3 col = laneColors[i];
+        float radius = 0.35f + 0.03f * std::sin(glfwGetTime() * 10.0f);
+        drawFlatRing(receptors[i], radius, col, 0.8f);
+        drawFlatRing(receptors[i], radius * 0.7f, col * 0.5f, 0.4f);
     }
 
-    // Render Climax Ring (expanding cylinder/ring)
-    if (state_ == VisualizerState::CLIMAX) {
-        float p = std::min(climaxTimer_ / 3.5f, 1.0f);
-        float radius = 0.01f + p * 8.0f;
-        float opacity = std::sin(p * M_PI) * 0.9f;
-        drawRing(glm::vec3(0.0f, 0.5f, 0.0f), radius, glm::vec3(0.53f, 0.26f, 1.0f), opacity);
+    // Draw Fretboard Receptor hit flames (vertical flame columns)
+    for (int i = 0; i < 4; i++) {
+        flameIntensity[i] = std::max(flameIntensity[i] - dt * 3.5f, 0.0f);
+        if (flameIntensity[i] > 0.01f) {
+            glm::mat4 model = glm::translate(glm::mat4(1.0f), receptors[i] + glm::vec3(0.0f, 0.4f * flameIntensity[i], 0.0f));
+            model = glm::scale(model, glm::vec3(0.4f, 0.9f * flameIntensity[i], 0.4f));
+            glm::vec3 fColor = laneColors[i] + glm::vec3(0.4f);
+            drawSphere(model, fColor, fColor * 0.8f, 0.75f * flameIntensity[i]);
+        }
     }
 
-    // Render particles
+    // Draw Scrolling Notes (Guitar Hero shield shape: squashed spheres)
+    for (const auto& note : notes_) {
+        if (note.hit) continue;
+
+        glm::vec3 col = laneColors[note.lane];
+        float noteScale = glm::mix(0.12f, 0.45f, std::min(note.progress, 1.0f));
+
+        glm::mat4 model = glm::translate(glm::mat4(1.0f), note.pos);
+        // Squash model along Y-axis to make it look like a flat disk/shield!
+        model = glm::scale(model, glm::vec3(noteScale, noteScale * 0.3f, noteScale));
+
+        // Draw note shield
+        drawSphere(model, col, col * 0.6f, 0.95f);
+        
+        // Draw outer ring around note
+        glm::mat4 outlineModel = glm::translate(glm::mat4(1.0f), note.pos);
+        outlineModel = glm::scale(outlineModel, glm::vec3(noteScale * 1.15f, noteScale * 0.32f, noteScale * 1.15f));
+        drawCube(outlineModel, col + glm::vec3(0.3f), col * 0.3f, 0.5f, true);
+    }
+
+    // Update and Render Sparks/Particles from Hits (shooting upward!)
     std::vector<float> particleCoords;
     for (auto it = particles_.begin(); it != particles_.end(); ) {
-        it->life -= dt * 1.5f;
+        it->life -= dt * 2.0f;
         if (it->life <= 0.0f) {
             it = particles_.erase(it);
         } else {
@@ -1088,8 +1046,8 @@ void Renderer::render(const HandList& hands, float dt) {
     if (!particleCoords.empty()) {
         glUseProgram(starfieldShader_);
         glUniformMatrix4fv(glGetUniformLocation(starfieldShader_, "model"), 1, GL_FALSE, glm::value_ptr(glm::mat4(1.0f)));
-        glUniform3f(glGetUniformLocation(starfieldShader_, "color"), 0.5f, 0.8f, 1.0f);
-        glUniform1f(glGetUniformLocation(starfieldShader_, "opacity"), 0.8f);
+        glUniform3f(glGetUniformLocation(starfieldShader_, "color"), 1.0f, 0.85f, 0.3f);
+        glUniform1f(glGetUniformLocation(starfieldShader_, "opacity"), 0.9f);
 
         GLuint partVAO, partVBO;
         glGenVertexArrays(1, &partVAO);
@@ -1106,79 +1064,34 @@ void Renderer::render(const HandList& hands, float dt) {
         glDeleteVertexArrays(1, &partVAO);
     }
 
-    // Render Hand Cursors
-    if (lerpedHandPositions_.size() < hands.size()) {
-        lerpedHandPositions_.resize(hands.size(), glm::vec3(0.0f));
-    }
-    if (prevHandPositions_.size() < hands.size()) {
-        prevHandPositions_.resize(hands.size(), glm::vec3(0.0f));
-    }
+    // Render Hand Cursors (Neon gold/purple spheres at the bottom plane)
     for (size_t i = 0; i < hands.size(); i++) {
         float mx = cfg_->mirror_x ? (1.0f - hands[i].x) : hands[i].x;
-        glm::vec3 wp = handWorldPos(mx, hands[i].y, hands[i].z, aspect);
-        
-        glm::vec3 prevPos = lerpedHandPositions_[i];
-        lerpedHandPositions_[i] = glm::mix(lerpedHandPositions_[i], wp, 0.3f);
-        glm::vec3 vel = lerpedHandPositions_[i] - prevPos;
+        glm::vec3 hp = handWorldPos(mx, hands[i].y, hands[i].z, aspect);
 
         glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, lerpedHandPositions_[i]);
+        model = glm::translate(model, hp);
+        
+        // Tilt hand rotation
+        model = glm::rotate(model, hp.x * 0.2f, glm::vec3(0.0f, 1.0f, 0.0f));
+        model = glm::rotate(model, hp.y * 0.15f, glm::vec3(1.0f, 0.0f, 0.0f));
 
-        // Apply lean rotation (tilts) matching JS physics
-        float posX = lerpedHandPositions_[i].x;
-        float posY = lerpedHandPositions_[i].y;
-        float rotZ = -posX * 0.3f - vel.x * 6.0f;
-        float rotX =  posY * 0.2f + vel.y * 4.0f;
-        float rotY =  posX * 0.2f;
-
-        model = glm::rotate(model, rotY, glm::vec3(0.0f, 1.0f, 0.0f));
-        model = glm::rotate(model, rotX, glm::vec3(1.0f, 0.0f, 0.0f));
-        model = glm::rotate(model, rotZ, glm::vec3(0.0f, 0.0f, 1.0f));
-
-        glm::vec3 hColor(1.0f);
-        if (i == 0)      hColor = glm::vec3(0.94f, 0.96f, 1.0f);
-        else if (i == 1) hColor = glm::vec3(1.0f, 0.88f, 0.66f);
-        else if (i == 2) hColor = glm::vec3(0.66f, 1.0f, 0.86f);
-        else             hColor = glm::vec3(1.0f, 0.66f, 1.0f);
-
+        glm::vec3 hColor(1.0f, 0.75f, 0.15f); // Neon Gold
+        if (i == 1) hColor = glm::vec3(1.0f, 0.25f, 0.9f); // Hand 2: Neon Purple
+        
         if (hasHandModel_) {
-            model = glm::scale(model, glm::vec3(0.28f));
-            drawModel(handModel_, model, hColor, hColor * 0.3f, 0.9f);
+            model = glm::scale(model, glm::vec3(0.35f));
+            drawModel(handModel_, model, hColor, hColor * 0.4f, 0.95f);
         } else {
-            model = glm::scale(model, glm::vec3(0.12f));
-            drawSphere(model, hColor, hColor * 0.3f, 0.9f);
+            model = glm::scale(model, glm::vec3(0.18f));
+            drawSphere(model, hColor, hColor * 0.4f, 0.95f);
         }
     }
 
-    // Render Frequency Tunnel (during CLIMAX & CONGRATS overlay)
-    if (state_ == VisualizerState::CLIMAX || state_ == VisualizerState::CONGRATULATIONS) {
-        float fTime = (state_ == VisualizerState::CLIMAX) ? climaxTimer_ : (3.5f + congratsTimer_);
-        glUseProgram(freqShader_);
-        glUniform1f(glGetUniformLocation(freqShader_, "u_time"), fTime);
-        glUniform2f(glGetUniformLocation(freqShader_, "u_resolution"), (float)width_, (float)height_);
-        
-        float offsetX = ((float)cfg_->crop_left + ((float)width_ - (float)cfg_->crop_left - (float)cfg_->crop_right) * 0.5f) - (float)width_ * 0.5f;
-        glUniform2f(glGetUniformLocation(freqShader_, "u_offset"), offsetX, 0.0f);
-
-        glBindVertexArray(quadVAO_);
-        glDisable(GL_DEPTH_TEST);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        glEnable(GL_DEPTH_TEST);
-    }
-
-    // Draw fade overlay if active
-    if (fadeState_ != FadeState::NONE) {
-        glUseProgram(flatShader_);
-        glUniform1f(glGetUniformLocation(flatShader_, "u_opacity"), fadeOpacity);
-        glBindVertexArray(quadVAO_);
-        glDisable(GL_DEPTH_TEST);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        glEnable(GL_DEPTH_TEST);
-    }
-
-    // Swap buffers & poll events
+    // Render V-Sync swaps and process GLFW inputs
     glfwSwapBuffers(window_);
     glfwPollEvents();
+
 }
 
 void GLBModel::draw() const {

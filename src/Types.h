@@ -58,3 +58,11 @@ struct GameStateData {
     Gesture   hint     = Gesture::UNKNOWN;
     MusicParams music;
 };
+
+struct TargetSpawn {
+    float x;
+    float y;
+    float z;
+    int type;
+    int hand;
+};

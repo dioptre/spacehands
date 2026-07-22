@@ -149,6 +149,8 @@ int main(int argc, char* argv[]) {
         float dt   = std::chrono::duration<float>(now - t_last).count();
         t_last     = now;
 
+        std::vector<TargetSpawn> spawns;
+
         if (f) {
             // Vision — use colour frame for detection if available (Mac webcam)
             cv::Mat confidence_input = f->cam.confidence;
@@ -324,7 +326,7 @@ int main(int argc, char* argv[]) {
             if (visualizer) {
                 current_seq = visualizer->getSequence();
             }
-            auto spawns = osc_rx.popSpawns();
+            spawns = osc_rx.popSpawns();
             ws.broadcast(state, hands, cfg.mirror_x,
                          cfg.coord_x_min, cfg.coord_x_max,
                          cfg.coord_y_min, cfg.coord_y_max,
@@ -336,7 +338,7 @@ int main(int argc, char* argv[]) {
         }
 
         if (visualizer) {
-            visualizer->render(last_hands, dt);
+            visualizer->render(last_hands, spawns, dt);
         } else {
             if (!f) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(5));
