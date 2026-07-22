@@ -65,4 +65,9 @@ struct TargetSpawn {
     float z;
     int type;
     int hand;
+    bool playCustom = false;
+    int midi = 60;
+    float gain = 1.0f;
+    float sustain = 1.0f;
+    std::string instrument = "arpy";
 };

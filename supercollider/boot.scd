@@ -7,8 +7,8 @@ if (File.exists(Platform.userAppSupportDir +/+ "synthdefs/dirt_convolve2.scsynde
 };
 
 // Guard: only run once per SC session
-if (~instrumentBooted != true) {
-~instrumentBooted = true;
+// if (~instrumentBooted != true) {
+// ~instrumentBooted = true;
 
 Routine({
     var instrumentRoot = "/Users/andrewgrosser/Documents/spacehands/supercollider";
@@ -65,4 +65,4 @@ Routine({
     "=== Instrument ready ===".postln;
 
 }).play;
-}; // end guard
+//}; // end guard

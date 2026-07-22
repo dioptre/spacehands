@@ -23,6 +23,26 @@ static int spawn_handler(const char *path, const char *types, lo_arg **argv,
     self->addSpawn(x, y, z, type, hand);
     return 0;
 }
+
+static int spawn_custom_handler(const char *path, const char *types, lo_arg **argv,
+                                int argc, lo_message data, void *user_data) {
+    auto* self = static_cast<OscReceiver*>(user_data);
+    if (!self) return 0;
+
+    // Parse arguments: /reflex/spawn_custom x(f) y(f) z(f) type(i) hand(i) instrument(s) midi(i) gain(f) sustain(f)
+    float x = argv[0]->f;
+    float y = argv[1]->f;
+    float z = argv[2]->f;
+    int type = argv[3]->i;
+    int hand = argv[4]->i;
+    const char* instrument = &argv[5]->s;
+    int midi = argv[6]->i;
+    float gain = argv[7]->f;
+    float sustain = argv[8]->f;
+
+    self->addSpawnCustom(x, y, z, type, hand, instrument, midi, gain, sustain);
+    return 0;
+}
 #endif
 
 OscReceiver::OscReceiver(int port) : port_(port) {}
@@ -43,7 +63,8 @@ bool OscReceiver::start() {
         }
 
         lo_server_add_method(static_cast<lo_server>(server_), "/reflex/spawn", "ffiii", spawn_handler, this);
-        std::cout << "[OscReceiver] listening on UDP port " << port_ << " for /reflex/spawn\n";
+        lo_server_add_method(static_cast<lo_server>(server_), "/reflex/spawn_custom", "ffiiisiff", spawn_custom_handler, this);
+        std::cout << "[OscReceiver] listening on UDP port " << port_ << " for /reflex/spawn and /reflex/spawn_custom\n";
 
         while (running_) {
             lo_server_recv_noblock(static_cast<lo_server>(server_), 5);
@@ -78,5 +99,20 @@ std::vector<TargetSpawn> OscReceiver::popSpawns() {
 void OscReceiver::addSpawn(float x, float y, float z, int type, int hand) {
     std::lock_guard<std::mutex> lock(mutex_);
     spawns_.push_back({x, y, z, type, hand});
+}
+void OscReceiver::addSpawnCustom(float x, float y, float z, int type, int hand, const std::string& instrument, int midi, float gain, float sustain) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    TargetSpawn s;
+    s.x = x;
+    s.y = y;
+    s.z = z;
+    s.type = type;
+    s.hand = hand;
+    s.playCustom = true;
+    s.midi = midi;
+    s.gain = gain;
+    s.sustain = sustain;
+    s.instrument = instrument;
+    spawns_.push_back(s);
 }
 #endif

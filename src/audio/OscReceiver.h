@@ -20,6 +20,7 @@ public:
 
 #ifdef HAVE_LIBLO
     void addSpawn(float x, float y, float z, int type, int hand);
+    void addSpawnCustom(float x, float y, float z, int type, int hand, const std::string& instrument, int midi, float gain, float sustain);
 #endif
 
 private:

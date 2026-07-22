@@ -83,6 +83,11 @@ private:
         int lane = 0;          // 0: UL, 1: UR, 2: LL, 3: LR
         int hand = 0;          // 0 or 1
         bool hit = false;
+        bool playCustom = false;
+        int midi = 60;
+        float gain = 1.0f;
+        float sustain = 1.0f;
+        std::string instrument = "arpy";
     };
     std::vector<VisualizerNote> notes_;
     int score_ = 0;

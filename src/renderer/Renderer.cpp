@@ -894,6 +894,11 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
             note.hand = spawn.hand;
             note.progress = 0.0f;
             note.hit = false;
+            note.playCustom = spawn.playCustom;
+            note.midi = spawn.midi;
+            note.gain = spawn.gain;
+            note.sustain = spawn.sustain;
+            note.instrument = spawn.instrument;
             notes_.push_back(note);
         }
     }
@@ -1073,7 +1078,9 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
                         burstParticles(receptors[it->lane]);
                         
                         if (osc_) {
-                            if (osc_->getActiveSong() == 6) {
+                            if (it->playCustom) {
+                                osc_->sendDirtPlay(it->midi, it->gain, it->sustain, it->instrument, 0);
+                            } else if (osc_->getActiveSong() == 6) {
                                 // Map target's visual lane directly to the correct G Major diatonic vocal note pitch!
                                 int midi = 55; // Fallback G4
                                 switch (it->lane) {
