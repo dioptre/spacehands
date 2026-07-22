@@ -174,7 +174,7 @@ int main(int argc, char* argv[]) {
             // Require ARRIVE_FRAMES consecutive detections before assigning
             // Pool assignment with minimal debounce — prevents YOLO flicker from
             // cycling through instruments. Cursor updates immediately (uses raw hands).
-            {
+            if (cfg.sc_instruments) {
                 static constexpr int STABLE_FRAMES = 5; // ~165ms at 30fps
                 static std::unordered_map<int,int> stableCount;
                 static std::unordered_set<int>     confirmed;
@@ -209,7 +209,6 @@ int main(int argc, char* argv[]) {
                 // Hush all patterns after 15s with no confirmed hands
                 static float silenceTimer = 0.f;
                 static bool  hushed = false;
-                bool& hushedRef = hushed; // accessible below for sendPool gate
                 if (confirmed.empty()) {
                     silenceTimer += dt;
                     if (silenceTimer >= 15.f && !hushed) {
@@ -256,7 +255,9 @@ int main(int argc, char* argv[]) {
             osc.setElapsedTime(elapsed_sec);
             osc.send(hands, music, state, cfg.sc_instruments);
             // OSC: pool assignments → Tidal /ctrl
-            osc.sendPool(pool, hands, music);
+            if (cfg.sc_instruments) {
+                osc.sendPool(pool, hands, music);
+            }
 
             // MJPEG: publish either the old processed hand-mask or a raw camera view.
             // On Pi/projector setups, "depth_color" gives the Arducam example-style

@@ -837,8 +837,8 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
     // State machine updates
     if (state_ == VisualizerState::IDLE) {
         notes_.clear();
-        // Wait for first hand to start game
-        if (!hands.empty()) {
+        // Wait for first hand or incoming note spawn to start game
+        if (!hands.empty() || !spawns.empty()) {
             state_ = VisualizerState::PLAYING;
             climaxTimer_ = 0.0f; // song progress timer
             idleTimer_ = 0.0f;   // hand-loss timeout timer

@@ -67,7 +67,7 @@ OSCdef(\orb_climax, { |msg|
 // === REFLEX RHYTHM GAME FORWARDER ===
 // Listens to Tidal plays (/dirt/play) and forwards "reflex" cue triggers to C++ on port 57130.
 OSCdef(\reflex_tidal_forwarder, { |msg|
-    var dict, x, y, z, type, hand, args, sName, gainVal, midiNote, nVal;
+    var dict, x, y, z, type, hand, args, sName, gainVal, midiNote, nVal, lanePitches, closestDiff, closestLane, isSilentCue;
 
     dict = Dictionary.new;
     // Skip the OSC path "/dirt/play" at index 0 and pair-up the tags/values
@@ -79,6 +79,9 @@ OSCdef(\reflex_tidal_forwarder, { |msg|
     sName = dict[\s].asString;
     gainVal = (dict[\gain] ? 1.0).asFloat;
 
+    // Diagnostic print
+    ("Tidal OSC Play -> s: " ++ sName ++ " | gain: " ++ gainVal ++ " | note: " ++ (dict[\note] ? dict[\n] ? "none")).postln;
+
     if (sName == "reflex") {
         x = dict[\pan] ? 0.5;
         y = dict[\speed] ? 0.5;
@@ -89,13 +92,35 @@ OSCdef(\reflex_tidal_forwarder, { |msg|
         NetAddr("127.0.0.1", 57130).sendMsg("/reflex/spawn", x.asFloat, y.asFloat, z.asFloat, type.asInteger, hand.asInteger);
     };
 
-    if (sName == "delaynote" || (sName == "arpy" && gainVal == 0.0)) {
+    isSilentCue = false;
+    if (sName == "delaynote") { isSilentCue = true; };
+    if (sName == "arpy" || (sName == "cue")) {
+        if (gainVal < 0.01) {
+            isSilentCue = true;
+        };
+    };
+
+    if (isSilentCue) {
         x = dict[\pan] ? 0.5;
         y = dict[\speed] ? 0.5;
         z = dict[\legato] ? 0.35;
         nVal = dict[\note] ? dict[\n] ? 0;
-        type = nVal.asInteger % 10;
         midiNote = nVal.asInteger + 60;
+        
+        // Find best fit lane index (0-9) based on closest MIDI pitch
+        lanePitches = [50, 52, 54, 55, 57, 59, 60, 62, 64, 66];
+        closestDiff = 999;
+        closestLane = 0;
+        
+        lanePitches.do { |pitch, idx|
+            var diff = (pitch - midiNote).abs;
+            if (diff < closestDiff) {
+                closestDiff = diff;
+                closestLane = idx;
+            };
+        };
+        type = closestLane;
+        
         ("Silent cue forward: lane=" ++ type ++ " midi=" ++ midiNote ++ " inst=" ++ sName).postln;
         NetAddr("127.0.0.1", 57130).sendMsg(
             "/reflex/spawn_custom", 

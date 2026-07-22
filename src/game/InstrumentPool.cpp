@@ -74,6 +74,18 @@ void InstrumentPool::freeSlot(int slot) {
 }
 
 InstrumentPool::Assignment* InstrumentPool::assign(int handId) {
+    // Check if hand is already assigned (even if fading out)
+    for (int i = 0; i < MAX_HANDS; ++i) {
+        if (assignments_[i].active && assignments_[i].handId == handId) {
+            assignments_[i].releaseTimer = 0.f;
+            assignments_[i].fadeOut = 1.f;
+            std::cout << "[Pool] hand " << handId
+                      << " restored → orbit " << assignments_[i].orbit+1
+                      << " → " << assignments_[i].inst.name << "\n";
+            return &assignments_[i];
+        }
+    }
+
     // Find free slot
     int slot = -1;
     for (int i = 0; i < MAX_HANDS; ++i)
