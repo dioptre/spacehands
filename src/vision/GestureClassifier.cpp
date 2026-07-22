@@ -79,11 +79,13 @@ HandList GestureClassifier::classify(const std::vector<Detection>& detections,
                                       const cv::Mat& depth_frame,
                                       const cv::Mat& confidence_frame,
                                       int W, int H,
-                                      const cv::Mat& /*color_frame*/) {
+                                      const cv::Mat& /*color_frame*/,
+                                      float min_depth_mm,
+                                      float max_depth_mm) {
     HandList hands;
     for (const auto& det : detections) {
         Hand h;
-        auto depth = DepthEstimator::estimate(depth_frame, det.bbox);
+        auto depth = DepthEstimator::estimate(depth_frame, det.bbox, min_depth_mm, max_depth_mm);
         h.x      = det.bbox.x + det.bbox.width  * 0.5f;
         h.y      = det.bbox.y + det.bbox.height * 0.5f;
         h.bw     = det.bbox.width;

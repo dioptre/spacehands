@@ -27,10 +27,24 @@ DepthResult DepthEstimator::estimate(const cv::Mat& depth_frame,
     cv::Mat region = depth_frame(roi).clone();
     region = region.reshape(1, region.total());
 
-    // Median depth (robust to noise)
-    std::vector<float> vals(region.begin<float>(), region.end<float>());
-    std::sort(vals.begin(), vals.end());
-    float median = vals[vals.size() / 2];
-    float norm   = 1.f - std::clamp((median - min_mm) / (max_mm - min_mm), 0.f, 1.f);
+    // Extract and filter out invalid/zero depth values (ToF dropout noise)
+    std::vector<float> vals;
+    vals.reserve(region.total());
+    for (auto it = region.begin<float>(); it != region.end<float>(); ++it) {
+        float val = *it;
+        if (val > 10.0f && val < max_mm * 1.5f) {
+            vals.push_back(val);
+        }
+    }
+
+    float median;
+    if (vals.empty()) {
+        median = (min_mm + max_mm) * 0.5f; // default to center of range
+    } else {
+        std::sort(vals.begin(), vals.end());
+        median = vals[vals.size() / 2];
+    }
+
+    float norm = 1.f - std::clamp((median - min_mm) / (max_mm - min_mm), 0.f, 1.f);
     return { norm, median };
 }

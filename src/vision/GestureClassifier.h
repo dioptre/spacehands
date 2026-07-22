@@ -12,7 +12,9 @@ public:
                       const cv::Mat& depth_frame,
                       const cv::Mat& confidence_frame,
                       int frame_w, int frame_h,
-                      const cv::Mat& color_frame = cv::Mat{});
+                      const cv::Mat& color_frame = cv::Mat{},
+                      float min_depth_mm = 200.f,
+                      float max_depth_mm = 1500.f);
 
 private:
     HandList prev_;

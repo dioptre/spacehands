@@ -166,7 +166,9 @@ int main(int argc, char* argv[]) {
                                                    confidence_input,
                                                    cam->width(),
                                                    cam->height(),
-                                                   f->cam.color);
+                                                   f->cam.color,
+                                                   150.0f,
+                                                   cfg.max_depth_mm);
 
             // Pool: debounced hand arrivals/departures
             // Require ARRIVE_FRAMES consecutive detections before assigning
