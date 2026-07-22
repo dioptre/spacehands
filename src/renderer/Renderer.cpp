@@ -837,19 +837,21 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
     // State machine updates
     if (state_ == VisualizerState::IDLE) {
         notes_.clear();
-        // Wait for first hand or incoming note spawn to start game
-        if (!hands.empty() || !spawns.empty()) {
+        // Wait for first hand to start game
+        if (!hands.empty()) {
             state_ = VisualizerState::PLAYING;
             climaxTimer_ = 0.0f; // song progress timer
             idleTimer_ = 0.0f;   // hand-loss timeout timer
             score_ = 0;
             combo_ = 0;
             if (osc_) {
+                osc_->sendReflexHush(); // play hush first!
                 osc_->setReflexActive(true);
-                osc_->setReflexCps(0.5208f);
+                osc_->setReflexCps(0.3f);
                 osc_->sendTidalCtrl("reflex_active", 1.0f);
                 osc_->sendTidalCtrl("reflex_song_6", 1.0f);
-                osc_->sendTidalCtrl("reflex_cps", 0.5208f);
+                osc_->sendTidalCtrl("reflex_cps", 0.3f);
+                osc_->sendTidalCtrlStr("reflex_notes", "<[~@2 b4 a4@2 b4@2 g4] [~@2 b4 g4 a4 b4 ~@2] [~@2 b4 a4@2 b4@2 g4] [~@2 d5 b4@2 a4 ~@2] [~ b4@2 a4@2 g4@2 ~] [g4@2 b4 d5@2 b4@2 g4] [a4@2 c5 b4@2 a4@2 fs4] [g4@2 a4 b4@2 d5@2 ~]>");
                 osc_->sendMuteBacking(false);
             }
         }
@@ -864,7 +866,9 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
                 if (osc_) {
                     osc_->sendTidalCtrl("reflex_active", 0.0f);
                     osc_->sendTidalCtrl("reflex_song_6", 0.0f);
+                    osc_->sendTidalCtrlStr("reflex_notes", "~");
                     osc_->sendMuteBacking(true);
+                    osc_->sendReflexHush(); // hush on timeout
                 }
             }
         } else {
@@ -876,7 +880,11 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
             state_ = VisualizerState::CONGRATULATIONS;
             congratsTimer_ = 0.0f;
             if (osc_) {
+                osc_->sendTidalCtrl("reflex_active", 0.0f);
+                osc_->sendTidalCtrl("reflex_song_6", 0.0f);
+                osc_->sendTidalCtrlStr("reflex_notes", "~");
                 osc_->sendMuteBacking(true);
+                osc_->sendReflexHush(); // hush at song end
             }
         }
     } else if (state_ == VisualizerState::CONGRATULATIONS) {

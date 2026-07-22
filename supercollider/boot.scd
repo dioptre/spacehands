@@ -57,7 +57,9 @@ Routine({
         .do { |k| ("  " ++ k).postln };
 
     // Load OSC responders + create synths (stored in ~instrumentSynths)
-    load(instrumentRoot +/+ "instruments.scd");
+    if (~reflexOnly != true) {
+        load(instrumentRoot +/+ "instruments.scd");
+    };
 
     // Load game responders (Stellar Offering)
     load(instrumentRoot +/+ "game.scd");

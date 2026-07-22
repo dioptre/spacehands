@@ -29,6 +29,7 @@ public:
     void sendTidalCtrlStr(const char* key, const char* val);
     void sendDirtPlay(int midi, float amp, float decay, const std::string& instrument = "superpiano", int orbit = 0);
     void sendMuteBacking(bool mute);
+    void sendReflexHush();
     void sendMute(bool muted);
     void setPreviewMute(bool muted);
     void setElapsedTime(float t);
@@ -41,7 +42,7 @@ public:
 private:
     int active_song_ = -1;
     bool reflex_active_ = false;
-    float reflex_cps_ = 0.5f;
+    float reflex_cps_ = 0.3f;
     std::string host_;
     int         port_;
 #ifdef HAVE_LIBLO

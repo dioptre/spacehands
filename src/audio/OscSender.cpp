@@ -214,12 +214,12 @@ void OscSender::send(const HandList& hands, const MusicParams& p, const GameStat
     // Returns to base when hands leave (smoothed)
     // If reflex_active_ is true, lock to reflex_cps_ exactly.
     if (tidal_) {
-        float currentCps = 0.5f;
+        float currentCps = 0.3f;
         if (reflex_active_) {
             currentCps = reflex_cps_;
         } else {
-            static float smoothCps = 0.5f;
-            float targetCps  = 0.5f;
+            static float smoothCps = 0.3f;
+            float targetCps  = 0.3f;
             int n = (int)hands.size();
             if (n == 0)      targetCps = 0.4f;
             else if (n == 1) targetCps = 0.45f;
@@ -369,11 +369,20 @@ void OscSender::sendMuteBacking(bool mute) {
 #endif
 }
 
+void OscSender::sendReflexHush() {
+#ifdef HAVE_LIBLO
+    if (!addr_) return;
+    lo_message m = lo_message_new();
+    lo_send_message(addr_, "/reflex/hush", m);
+    lo_message_free(m);
+#endif
+}
+
 void OscSender::sendDirtPlay(int midi, float amp, float decay, const std::string& instrument, int orbit) {
 #ifdef HAVE_LIBLO
     if (!addr_) return;
     lo_message m = lo_message_new();
-    lo_message_add_string(m, "cps");      lo_message_add_float(m, 0.5f);
+    lo_message_add_string(m, "cps");      lo_message_add_float(m, 0.3f);
     lo_message_add_string(m, "cycle");    lo_message_add_float(m, 0.f);
     lo_message_add_string(m, "delta");    lo_message_add_float(m, 0.5f);
     lo_message_add_string(m, "orbit");    lo_message_add_int32(m, orbit);
