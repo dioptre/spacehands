@@ -155,11 +155,18 @@ void HttpServer::start() {
                     // Send /ctrl to Tidal on port 6010
                     std::string key = j["ctrl"];
                     
-                    // Intercept reflex controls for backend tempo bypassing
+                    // Intercept reflex controls for backend tempo bypassing and song selection
                     if (key == "reflex_active" && osc_) {
                         osc_->setReflexActive(j["value"].get<double>() > 0.5);
                     } else if (key == "reflex_cps" && osc_) {
                         osc_->setReflexCps((float)j["value"].get<double>());
+                    } else if (key.rfind("reflex_song_", 0) == 0 && osc_) {
+                        if (j["value"].get<double>() > 0.5) {
+                            try {
+                                int songId = std::stoi(key.substr(12));
+                                osc_->setActiveSong(songId);
+                            } catch (...) {}
+                        }
                     }
 
                     lo_address tidal = lo_address_new("127.0.0.1", "6010");

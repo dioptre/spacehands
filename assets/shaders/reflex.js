@@ -130,6 +130,10 @@
                     <div class="song-title">Da Funk</div>
                     <div class="song-meta">Daft Punk • 111 BPM • Heavy G-Funk</div>
                 </div>
+                <div class="song-card" data-song="6" data-bpm="125" data-cps="0.5208">
+                    <div class="song-title">Here Comes The Sun</div>
+                    <div class="song-meta">The Beatles • 125 BPM • Interactive Vocals</div>
+                </div>
             </div>
         </div>
         <div id="reflex-hud">
@@ -495,7 +499,8 @@ function startSong(songId, bpm, cps) {
         '1': 'Seven Nation Army',
         '2': 'Blue Monday',
         '3': 'Around the World',
-        '4': 'Da Funk'
+        '4': 'Da Funk',
+        '6': 'Here Comes The Sun'
     };
     hudTitle.textContent = songNames[songId] || 'Reflex Song';
     hudBpm.textContent = bpm + ' BPM';

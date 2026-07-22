@@ -27,15 +27,19 @@ public:
     // Custom helper methods for visualizer/game triggering
     void sendTidalCtrl(const char* key, float val);
     void sendTidalCtrlStr(const char* key, const char* val);
-    void sendDirtPlay(int midi, float amp, float decay);
+    void sendDirtPlay(int midi, float amp, float decay, const std::string& instrument = "superpiano", int orbit = 0);
+    void sendMuteBacking(bool mute);
     void sendMute(bool muted);
     void setPreviewMute(bool muted);
     void setElapsedTime(float t);
     void setTargetNode(int idx);
     void setReflexActive(bool active);
     void setReflexCps(float cps);
+    void setActiveSong(int id) { active_song_ = id; }
+    int getActiveSong() const { return active_song_; }
 
 private:
+    int active_song_ = -1;
     bool reflex_active_ = false;
     float reflex_cps_ = 0.5f;
     std::string host_;

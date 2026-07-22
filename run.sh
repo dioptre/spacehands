@@ -64,32 +64,33 @@ sed "s|/Users/andrewgrosser|$HOME|g" "$HOME/Documents/tidal/BootTidal.hs" > "$HO
 if [ "$OS" = "Darwin" ]; then
     SCLANG="/Applications/SuperCollider.app/Contents/MacOS/sclang"
 
-    # RESET_SC=1 ./run.sh to kill existing SC and start fresh
-    if [ "${RESET_SC:-0}" = "1" ]; then
-        echo "  Killing SuperCollider for clean restart..."
-        pkill -9 -f "sclang"  2>/dev/null || true
-        pkill -9 -f "scsynth" 2>/dev/null || true
-        sleep 2
-    fi
+    echo "  Killing any running SuperCollider instances..."
+    pkill -9 -f "sclang"  2>/dev/null || true
+    pkill -9 -f "scsynth" 2>/dev/null || true
+    sleep 2
 
-    # SC must run in GUI on Mac — check it's already up
-    if lsof -i UDP:57120 >/dev/null 2>&1; then
-        echo "  SuperCollider running ✓"
-    else
-        echo ""
-        echo "  ┌──────────────────────────────────────────────────────┐"
-        echo "  │  SuperCollider not running.                          │"
-        echo "  │  1. Open SuperCollider.app                           │"
-        echo "  │  2. Run startup.scd (Cmd+A then Shift+Enter)         │"
-        echo "  │  3. Wait for 'SuperDirt: listening' in post window   │"
-        echo "  │  4. Re-run: ./run.sh                                 │"
-        echo "  └──────────────────────────────────────────────────────┘"
+    echo "  Starting SuperCollider CLI..."
+    "$SCLANG" "$HOME/Documents/tidal/startup.scd" > /tmp/sc_instrument.log 2>&1 &
+    SC_PID=$!
+
+    echo "  Waiting for SuperCollider to listen on UDP port 57120..."
+    for i in {1..20}; do
+        if lsof -i UDP:57120 >/dev/null 2>&1; then
+            echo "  SuperCollider running ✓"
+            break
+        fi
+        sleep 1.5
+    done
+
+    if ! lsof -i UDP:57120 >/dev/null 2>&1; then
+        echo "  SuperCollider failed to start. Logs are in /tmp/sc_instrument.log"
         exit 1
     fi
 
     # Kill and restart Tidal
-    echo "  Killing any running Tidal instances..."
-    pkill -f "ghci" 2>/dev/null || true
+    echo "  Killing any running Tidal/GHC processes..."
+    pkill -9 -f "ghci" 2>/dev/null || true
+    pkill -9 -f "ghc-" 2>/dev/null || true
     sleep 2
 
     echo "  Starting Tidal with instrument patterns..."

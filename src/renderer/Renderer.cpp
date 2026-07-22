@@ -101,7 +101,7 @@ static const float cubeEdgesVertices[] = {
 };
 
 // Pentatonic MIDI notes & Names
-static const int PENTA[] = {60, 62, 64, 67, 69, 72, 74, 76, 79, 81, 84, 86};
+static const int PENTA[] = {53, 55, 57, 58, 60, 62, 64, 65, 67, 69, 70, 72};
 static const char* NOTE_NAMES[] = {"c4","d4","e4","g4","a4","c5","d5","e5","g5","a5","c6","d6"};
 
 // Helper to generate a UV sphere
@@ -546,6 +546,12 @@ bool Renderer::init(int width, int height, bool fullscreen, OscSender& osc, cons
     osc_ = &osc;
     cfg_ = &cfg;
 
+    // Set default song and ensure backing track is muted on boot
+    if (osc_) {
+        osc_->setActiveSong(6);
+        osc_->sendMuteBacking(true);
+    }
+
     if (!glfwInit()) {
         std::cerr << "[Renderer] Failed to initialize GLFW\n";
         return false;
@@ -669,8 +675,7 @@ void Renderer::resetGame() {
     sequenceAge_ = 0.0f;
     state_ = VisualizerState::IDLE;
     if (osc_) {
-        osc_->sendTidalCtrl("reflex_active", 0.0f);
-        osc_->sendTidalCtrl("reflex_song_6", 0.0f);
+        osc_->sendMuteBacking(true);
     }
     osc_->setPreviewMute(false);
 
@@ -792,7 +797,8 @@ void Renderer::updateCellVisuals(int i, glm::vec3& color, glm::vec3& emissive, f
 void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spawns, float dt) {
     // All 10 lanes are active by default to support 10-note melodic songs mapping
     int activeLanes = 10;
-    float travelTime = 2.0f;
+    // travelTime matches cycle duration (1.0 / 0.5375) at 129 BPM (Here Comes The Sun) for perfect downbeat sync
+    float travelTime = 1.8605f;
     int currentLevel = 4;
 
     // 10 distinct 3D receptor coordinates forming a vertical sloped triangle (4, 3, 2, 1)
@@ -838,15 +844,13 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
             idleTimer_ = 0.0f;   // hand-loss timeout timer
             score_ = 0;
             combo_ = 0;
-            // Trigger GHCi backing track for Song 6 (Here Comes The Sun)
             if (osc_) {
+                osc_->setReflexActive(true);
+                osc_->setReflexCps(0.5208f);
                 osc_->sendTidalCtrl("reflex_active", 1.0f);
                 osc_->sendTidalCtrl("reflex_song_6", 1.0f);
-                osc_->sendTidalCtrl("reflex_song_1", 0.0f);
-                osc_->sendTidalCtrl("reflex_song_2", 0.0f);
-                osc_->sendTidalCtrl("reflex_song_3", 0.0f);
-                osc_->sendTidalCtrl("reflex_song_4", 0.0f);
-                osc_->sendTidalCtrl("reflex_song_5", 0.0f);
+                osc_->sendTidalCtrl("reflex_cps", 0.5208f);
+                osc_->sendMuteBacking(false);
             }
         }
     } else if (state_ == VisualizerState::PLAYING) {
@@ -860,19 +864,19 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
                 if (osc_) {
                     osc_->sendTidalCtrl("reflex_active", 0.0f);
                     osc_->sendTidalCtrl("reflex_song_6", 0.0f);
+                    osc_->sendMuteBacking(true);
                 }
             }
         } else {
             idleTimer_ = 0.0f;
         }
 
-        // Song end check (length is 64 seconds at 129 BPM)
-        if (climaxTimer_ >= 64.0f) {
+        // Song end check (length is 60 seconds at 129 BPM)
+        if (climaxTimer_ >= 60.0f) {
             state_ = VisualizerState::CONGRATULATIONS;
             congratsTimer_ = 0.0f;
             if (osc_) {
-                osc_->sendTidalCtrl("reflex_active", 0.0f);
-                osc_->sendTidalCtrl("reflex_song_6", 0.0f);
+                osc_->sendMuteBacking(true);
             }
         }
     } else if (state_ == VisualizerState::CONGRATULATIONS) {
@@ -894,7 +898,7 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
         }
     }
 
-    // Fallback spawner (only if playing and no OSC notes)
+    // Fallback spawner (disabled to prevent random cues from clashing with the melody)
     static float lastOscTime = 999.0f;
     if (!spawns.empty()) {
         lastOscTime = 0.0f;
@@ -903,7 +907,7 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
     }
 
     static float spawnTimer = 0.0f;
-    if (state_ == VisualizerState::PLAYING && lastOscTime > 3.0f) {
+    if (false && state_ == VisualizerState::PLAYING && lastOscTime > 3.0f) {
         spawnTimer += dt;
         if (spawnTimer >= 0.5f) {
             spawnTimer = 0.0f;
@@ -1060,7 +1064,7 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
                     float dy = std::abs(handPos.y - receptors[it->lane].y);
                     float dz = std::abs(handPos.z - receptors[it->lane].z);
                     
-                    if (dx < 0.75f && dy < 0.65f && dz < 1.6f) {
+                    if (dx < 1.15f && dy < 1.05f && dz < 2.5f) {
                         it->hit = true;
                         combo_++;
                         score_ += 100 * combo_;
@@ -1069,7 +1073,26 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
                         burstParticles(receptors[it->lane]);
                         
                         if (osc_) {
-                            osc_->sendDirtPlay(PENTA[it->lane * 3 % 12], 0.85f, 0.45f);
+                            if (osc_->getActiveSong() == 6) {
+                                // Map target's visual lane directly to the correct G Major diatonic vocal note pitch!
+                                int midi = 55; // Fallback G4
+                                switch (it->lane) {
+                                    case 0:  midi = 50; break; // D4
+                                    case 1:  midi = 52; break; // E4
+                                    case 2:  midi = 54; break; // F#4
+                                    case 3:  midi = 55; break; // G4
+                                    case 4:  midi = 57; break; // A4
+                                    case 5:  midi = 59; break; // B4
+                                    case 6:  midi = 60; break; // C5
+                                    case 7:  midi = 62; break; // D5
+                                    case 8:  midi = 64; break; // E5
+                                    case 9:  midi = 66; break; // F#5
+                                    default: midi = 55; break;
+                                }
+                                osc_->sendDirtPlay(midi, 1.25f, 0.65f, "supermandolin", 11);
+                            } else {
+                                osc_->sendDirtPlay(PENTA[it->lane * 3 % 12], 0.85f, 0.45f);
+                            }
                         }
                         break;
                     }
@@ -1122,7 +1145,7 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
                 model = glm::rotate(model, angle, glm::vec3(0.0f, 1.0f, 0.0f));
                 model = glm::rotate(model, angle * 0.4f, glm::vec3(1.0f, 0.0f, 0.1f));
                 
-                float scaleVal = noteScale * 0.45f;
+                float scaleVal = noteScale * 0.32f;
                 model = glm::scale(model, glm::vec3(scaleVal));
                 
                 drawModel(alienModel_, model, col, col * 0.4f, 0.95f);

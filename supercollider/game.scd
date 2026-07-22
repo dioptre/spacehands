@@ -73,23 +73,36 @@ OSCdef(\reflex_tidal_forwarder, { |msg|
     // Skip the OSC path "/dirt/play" at index 0 and pair-up the tags/values
     args = msg.copyToEnd(1);
     args.pairsDo { |k, v|
-        if (k.isString || k.isSymbol) {
-            dict[k.asSymbol] = v;
-        };
+        dict[k.asSymbol] = v;
     };
 
     // If it's a reflex spawn trigger
-    if (dict[\s] == "reflex") {
+    if (dict[\s].asString == "reflex") {
         x = dict[\pan] ? 0.5;
         y = dict[\speed] ? 0.5;
         z = dict[\legato] ? 0.35;
-        type = dict[\note] ? 0;
+        type = dict[\note] ? dict[\n] ? 0;
         hand = dict[\n] ? 0;
+
+        ("Reflex forward: lane=" ++ type ++ " hand=" ++ hand).postln;
 
         // Forward to C++ backend OscReceiver on UDP port 57130
         NetAddr("127.0.0.1", 57130).sendMsg("/reflex/spawn", x.asFloat, y.asFloat, z.asFloat, type.asInteger, hand.asInteger);
     };
 }, '/dirt/play');
+
+OSCdef(\mute_backing_track, { |msg|
+    var val = msg[1].asInteger;
+    if (~dirt.notNil) {
+        if (val == 1) {
+            ~dirt.orbits[11].set(\amp, 0.0);
+            "Muted backing track (orbit 11)".postln;
+        } {
+            ~dirt.orbits[11].set(\amp, 1.25);
+            "Unmuted backing track (orbit 11)".postln;
+        };
+    };
+}, '/mute_backing');
 
 "Game OSC responders active — Stellar Offering + Reflex ready".postln;
 
