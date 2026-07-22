@@ -1,15 +1,17 @@
 // Instrument integration — load into running SuperDirt instance.
-// Run: load("/Users/andrewgrosser/Documents/ag/instrument/supercollider/boot.scd");
+// Run: load("/Users/andrewgrosser/Documents/spacehands/supercollider/boot.scd");
 
-// Delete corrupt synthdef that keeps regenerating
-File.delete(Platform.userAppSupportDir +/+ "synthdefs/dirt_convolve2.scsyndef");
+// Delete corrupt synthdef if it exists
+if (File.exists(Platform.userAppSupportDir +/+ "synthdefs/dirt_convolve2.scsyndef")) {
+    File.delete(Platform.userAppSupportDir +/+ "synthdefs/dirt_convolve2.scsyndef");
+};
 
 // Guard: only run once per SC session
 if (~instrumentBooted != true) {
 ~instrumentBooted = true;
 
 Routine({
-    var instrumentRoot = thisProcess.nowExecutingPath.dirname;
+    var instrumentRoot = "/Users/andrewgrosser/Documents/spacehands/supercollider";
 
     // Free any previously created instrument synths to avoid node conflicts
     if (~instrumentSynths.notNil) {

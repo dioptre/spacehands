@@ -62,6 +62,7 @@ set(SOURCES
     src/game/InstrumentMapper.cpp
     src/game/InstrumentPool.cpp
     src/audio/OscSender.cpp
+    src/audio/OscReceiver.cpp
     src/server/HttpServer.cpp
     src/server/WsServer.cpp
     src/server/MjpegStreamer.cpp

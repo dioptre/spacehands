@@ -1,4 +1,5 @@
 #include "WsServer.h"
+#include "audio/OscReceiver.h"
 #include <algorithm>
 #include <iostream>
 #if __has_include(<nlohmann/json.hpp>)
@@ -7,6 +8,7 @@
 #  include "../../third_party/json.hpp"
 #endif
 #include <httplib.h>
+
 
 WsServer::WsServer(int port) : port_(port) {}
 
@@ -23,7 +25,8 @@ struct AxisRange {
 static std::string buildJson(const GameStateData& state, const HandList& hands, bool mirrorX,
                               float xMin, float xMax, float yMin, float yMax, float zMin, float zMax,
                               bool showHints, bool showPreviewHistory,
-                              const std::vector<int>& sequence) {
+                              const std::vector<int>& sequence,
+                              const std::vector<TargetSpawn>& spawns) {
     using json = nlohmann::json;
     AxisRange rx(xMin, xMax), ry(yMin, yMax), rz(zMin, zMax);
 
@@ -38,6 +41,20 @@ static std::string buildJson(const GameStateData& state, const HandList& hands, 
     j["show_preview_history"] = showPreviewHistory;
     if (!sequence.empty()) {
         j["sequence"] = sequence;
+    }
+
+    if (!spawns.empty()) {
+        json jspawns = json::array();
+        for (const auto& s : spawns) {
+            jspawns.push_back({
+                {"x", s.x},
+                {"y", s.y},
+                {"z", s.z},
+                {"type", s.type},
+                {"hand", s.hand}
+            });
+        }
+        j["spawns"] = jspawns;
     }
 
     float cx = 0, cy = 0;
@@ -62,10 +79,12 @@ static std::string buildJson(const GameStateData& state, const HandList& hands, 
 void WsServer::broadcast(const GameStateData& state, const HandList& hands, bool mirrorX,
                           float xMin, float xMax, float yMin, float yMax, float zMin, float zMax,
                           bool showHints, bool showPreviewHistory,
-                          const std::vector<int>& sequence) {
+                          const std::vector<int>& sequence,
+                          const std::vector<TargetSpawn>& spawns) {
     std::lock_guard<std::mutex> lk(mutex_);
-    latest_json_ = buildJson(state, hands, mirrorX, xMin, xMax, yMin, yMax, zMin, zMax, showHints, showPreviewHistory, sequence);
+    latest_json_ = buildJson(state, hands, mirrorX, xMin, xMax, yMin, yMax, zMin, zMax, showHints, showPreviewHistory, sequence, spawns);
 }
+
 
 void WsServer::start() {
     running_ = true;

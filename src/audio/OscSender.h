@@ -32,8 +32,12 @@ public:
     void setPreviewMute(bool muted);
     void setElapsedTime(float t);
     void setTargetNode(int idx);
+    void setReflexActive(bool active);
+    void setReflexCps(float cps);
 
 private:
+    bool reflex_active_ = false;
+    float reflex_cps_ = 0.5f;
     std::string host_;
     int         port_;
 #ifdef HAVE_LIBLO

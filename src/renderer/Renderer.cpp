@@ -241,7 +241,7 @@ GLuint Renderer::linkProgram(GLuint vert, GLuint frag) {
 
 void Renderer::initShaders() {
     const std::string mainVertShader = R"(
-        #version 130
+        #version 150
         in vec3 aPos;
         in vec3 aNormal;
 
@@ -260,7 +260,7 @@ void Renderer::initShaders() {
     )";
 
     const std::string mainFragShader = R"(
-        #version 130
+        #version 150
         out vec4 FragColor;
 
         in vec3 FragPos;
@@ -282,19 +282,19 @@ void Renderer::initShaders() {
     )";
 
     const std::string starVertShader = R"(
-        #version 130
+        #version 150
         in vec3 aPos;
         uniform mat4 view;
         uniform mat4 projection;
         uniform mat4 model;
         void main() {
             gl_Position = projection * view * model * vec4(aPos, 1.0);
-            gl_PointSize = 4.0;
+            gl_PointSize = 12.0;
         }
     )";
 
     const std::string starFragShader = R"(
-        #version 130
+        #version 150
         out vec4 FragColor;
         uniform vec3 color;
         uniform float opacity;
@@ -304,7 +304,7 @@ void Renderer::initShaders() {
     )";
 
     const std::string freqVertShader = R"(
-        #version 130
+        #version 150
         in vec2 aPos;
         out vec2 v_uv;
         void main() {
@@ -314,7 +314,7 @@ void Renderer::initShaders() {
     )";
 
     const std::string freqFragShader = R"(
-        #version 130
+        #version 150
         out vec4 fragColor;
         in vec2 v_uv;
         uniform float u_time;
@@ -379,7 +379,7 @@ void Renderer::initShaders() {
     glDeleteShader(fFreq);
 
     const std::string flatVertShader = R"(
-        #version 130
+        #version 150
         in vec2 aPos;
         void main() {
             gl_Position = vec4(aPos, 0.0, 1.0);
@@ -387,7 +387,7 @@ void Renderer::initShaders() {
     )";
 
     const std::string flatFragShader = R"(
-        #version 130
+        #version 150
         out vec4 fragColor;
         uniform float u_opacity;
         void main() {
@@ -766,18 +766,18 @@ void Renderer::updateCellVisuals(int i, glm::vec3& color, glm::vec3& emissive, f
             }
         }
     } else if (isDecoy) {
-        color = glm::vec3(0.04f, 0.06f, 0.2f);
-        emissive = glm::vec3(0.02f, 0.03f, 0.09f);
-        opacity = 0.35f;
+        color = glm::vec3(0.3f, 0.45f, 0.8f);
+        emissive = glm::vec3(0.12f, 0.18f, 0.4f);
+        opacity = 0.8f;
     } else {
         if (cfg_ && !cfg_->show_hints) {
-            color = glm::vec3(0.04f, 0.06f, 0.2f);
-            emissive = glm::vec3(0.02f, 0.03f, 0.09f);
-            opacity = 0.35f;
+            color = glm::vec3(0.3f, 0.45f, 0.8f);
+            emissive = glm::vec3(0.12f, 0.18f, 0.4f);
+            opacity = 0.8f;
         } else {
-            color = glm::vec3(0.1f, 0.13f, 0.4f);
-            emissive = glm::vec3(0.04f, 0.06f, 0.26f);
-            opacity = 0.5f;
+            color = glm::vec3(0.5f, 0.65f, 1.0f);
+            emissive = glm::vec3(0.2f, 0.3f, 0.6f);
+            opacity = 0.9f;
         }
     }
 }

@@ -146,14 +146,22 @@ void HttpServer::start() {
 
         // /orb POST — game events from browser → OSC
         // Handles: offering game orbs, transformation station /ctrl messages
-        svr.Post("/orb", [](const httplib::Request& req, httplib::Response& res) {
+        svr.Post("/orb", [this](const httplib::Request& req, httplib::Response& res) {
 #ifdef HAVE_LIBLO
             try {
                 auto j = nlohmann::json::parse(req.body);
 
                 if (j.contains("ctrl")) {
-                    // Transformation Station: send /ctrl to Tidal on port 6010
+                    // Send /ctrl to Tidal on port 6010
                     std::string key = j["ctrl"];
+                    
+                    // Intercept reflex controls for backend tempo bypassing
+                    if (key == "reflex_active" && osc_) {
+                        osc_->setReflexActive(j["value"].get<double>() > 0.5);
+                    } else if (key == "reflex_cps" && osc_) {
+                        osc_->setReflexCps((float)j["value"].get<double>());
+                    }
+
                     lo_address tidal = lo_address_new("127.0.0.1", "6010");
                     lo_message m = lo_message_new();
                     lo_message_add_string(m, key.c_str());

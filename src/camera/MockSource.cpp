@@ -58,7 +58,27 @@ bool MockSource::nextFrame(CameraFrame& out, int /*timeout_ms*/) {
             cap_.release();
             std::cerr << "[MockSource] webcam lost\n";
         }
-        out.confidence = cv::Mat(h_, w_, CV_32F, cv::Scalar(0.f));
+        
+        // Generate an animated mock silhouette so the edge outline shader has something to trace!
+        cv::Mat mock_color = cv::Mat::zeros(h_, w_, CV_8UC3);
+        
+        // Draw head
+        float pulse = std::sin(frame_idx_ * 0.05f) * 5.0f;
+        cv::circle(mock_color, cv::Point(w_ / 2, h_ / 3 + (int)pulse), 25, cv::Scalar(180, 50, 220), -1);
+        
+        // Draw body
+        cv::ellipse(mock_color, cv::Point(w_ / 2, h_ * 2 / 3), cv::Size(30, 45), 0, 0, 360, cv::Scalar(180, 50, 220), -1);
+        
+        // Draw moving arms
+        float arm_y = std::sin(frame_idx_ * 0.1f) * 15.0f;
+        cv::line(mock_color, cv::Point(w_ / 2 - 30, h_ * 2 / 3 - 10), cv::Point(w_ / 2 - 70, h_ * 2 / 3 + (int)arm_y), cv::Scalar(180, 50, 220), 8);
+        cv::line(mock_color, cv::Point(w_ / 2 + 30, h_ * 2 / 3 - 10), cv::Point(w_ / 2 + 70, h_ * 2 / 3 - (int)arm_y), cv::Scalar(180, 50, 220), 8);
+
+        out.color = mock_color;
+        
+        cv::Mat gray;
+        cv::cvtColor(mock_color, gray, cv::COLOR_BGR2GRAY);
+        gray.convertTo(out.confidence, CV_32F, 1024.f / 255.f);
     }
 
     // 1300mm → z = 1 - (1300-200)/1800 = 1 - 0.611 = 0.389 → near bucket (< 0.5)

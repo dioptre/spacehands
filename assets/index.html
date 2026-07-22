@@ -48,6 +48,7 @@
   <button data-shader="hand">hand</button>
   <button data-shader="offering">offering</button>
   <button data-shader="transformation">transformation</button>
+  <button data-shader="reflex">reflex</button>
   <button id="mirror-btn" onclick="event.stopPropagation()" style="border-color:rgba(255,255,0,0.4);color:rgba(255,255,0,0.7)">mirror: off</button>
 </div>
 
@@ -94,7 +95,7 @@ window.apiHost = isPi ? '127.0.0.1' : 'localhost';
     cropR.addEventListener('input', applyCrop);
 
     // ---- Shader switcher ----
-    const SHADERS = ['wormhole', 'voronoi', 'frequency', 'hand', 'offering', 'transformation'];
+    const SHADERS = ['wormhole', 'voronoi', 'frequency', 'hand', 'offering', 'transformation', 'reflex'];
     const params  = new URLSearchParams(window.location.search);
     let current   = params.get('shader') || 'wormhole';
     if (!SHADERS.includes(current)) current = 'wormhole';
@@ -106,7 +107,7 @@ window.apiHost = isPi ? '127.0.0.1' : 'localhost';
         document.querySelectorAll('#shader-switcher button').forEach(b => {
             b.classList.toggle('active', b.dataset.shader === name);
         });
-        if (window.startMjpeg) window.startMjpeg(name === 'frequency');
+        if (window.startMjpeg) window.startMjpeg(name === 'frequency' || name === 'reflex');
         const url = new URL(window.location);
         url.searchParams.set('shader', name);
         window.history.replaceState({}, '', url);

@@ -143,6 +143,8 @@ void OscSender::setPreviewMute(bool muted) {
 }
 void OscSender::setElapsedTime(float t) { elapsed_time_ = t; }
 void OscSender::setTargetNode(int idx) { target_node_idx_ = idx; }
+void OscSender::setReflexActive(bool active) { reflex_active_ = active; }
+void OscSender::setReflexCps(float cps) { reflex_cps_ = cps; }
 
 void OscSender::send(const HandList& hands, const MusicParams& p, const GameStateData& state, bool scInstruments) {
     if (!addr_) return;
@@ -210,28 +212,38 @@ void OscSender::send(const HandList& hands, const MusicParams& p, const GameStat
     // Adjust CPS based on number of hands — more hands = faster tempo
     // 1 hand = 0.4 cps (~96bpm), 4 hands = 0.7 cps (~168bpm)
     // Returns to base when hands leave (smoothed)
+    // If reflex_active_ is true, lock to reflex_cps_ exactly.
     if (tidal_) {
-        static float currentCps = 0.5f;
-        static float targetCps  = 0.5f;
-        int n = (int)hands.size();
-        if (n == 0)      targetCps = 0.4f;
-        else if (n == 1) targetCps = 0.45f;
-        else if (n == 2) targetCps = 0.55f;
-        else if (n == 3) targetCps = 0.62f;
-        else             targetCps = 0.70f;
+        float currentCps = 0.5f;
+        if (reflex_active_) {
+            currentCps = reflex_cps_;
+        } else {
+            static float smoothCps = 0.5f;
+            float targetCps  = 0.5f;
+            int n = (int)hands.size();
+            if (n == 0)      targetCps = 0.4f;
+            else if (n == 1) targetCps = 0.45f;
+            else if (n == 2) targetCps = 0.55f;
+            else if (n == 3) targetCps = 0.62f;
+            else             targetCps = 0.70f;
 
-        // Smooth transition
-        currentCps += (targetCps - currentCps) * 0.02f;
+            // Smooth transition
+            smoothCps += (targetCps - smoothCps) * 0.02f;
+            currentCps = smoothCps;
+        }
 
         static float lastSentCps = 0.f;
         if (std::fabs(currentCps - lastSentCps) > 0.002f) {
             lastSentCps = currentCps;
+#ifdef HAVE_LIBLO
             lo_message m = lo_message_new();
             lo_message_add_float(m, currentCps);
             lo_send_message(tidal_, "/setcps", m);
             lo_message_free(m);
+#endif
         }
     }
+
 
     // Send hand data as /ctrl to Tidal at ~10Hz (not every frame)
     static int ctrl_count = 0;

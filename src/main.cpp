@@ -25,6 +25,7 @@ static void lo_send_message(void*, const char*, lo_message) {}
 #include "game/InstrumentMapper.h"
 #include "game/InstrumentPool.h"
 #include "audio/OscSender.h"
+#include "audio/OscReceiver.h"
 #include "server/HttpServer.h"
 #include "server/WsServer.h"
 #include "server/MjpegStreamer.h"
@@ -88,6 +89,10 @@ int main(int argc, char* argv[]) {
     }
     osc.connectTidal("127.0.0.1", 6010); // also send /ctrl to Tidal
     osc.silenceAllOrbits();              // clear stale gains on startup
+
+    // ---- OSC Receiver ----
+    OscReceiver     osc_rx(57130);
+    osc_rx.start();
 
     // ---- Servers ----
     // Assets dir: relative to binary (copied by CMake post-build)
@@ -319,12 +324,13 @@ int main(int argc, char* argv[]) {
             if (visualizer) {
                 current_seq = visualizer->getSequence();
             }
+            auto spawns = osc_rx.popSpawns();
             ws.broadcast(state, hands, cfg.mirror_x,
                          cfg.coord_x_min, cfg.coord_x_max,
                          cfg.coord_y_min, cfg.coord_y_max,
                          cfg.coord_z_min, cfg.coord_z_max,
                          cfg.show_hints, cfg.show_preview_history,
-                         current_seq);
+                         current_seq, spawns);
 
             last_hands = hands;
         }
@@ -343,6 +349,7 @@ int main(int argc, char* argv[]) {
     if (visualizer) {
         visualizer->close();
     }
+    osc_rx.stop();
     http.stop();
     ws.stop();
     mjpeg.stop();
