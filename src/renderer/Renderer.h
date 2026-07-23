@@ -94,6 +94,8 @@ private:
     int combo_ = 0;
     int maxCombo_ = 0;
     std::string currentInstrument_ = "superpiano";
+    int totalNotesPassed_ = 0;
+    int successfulHits_ = 0;
 
     enum class FadeState { NONE, FADE_OUT, FADE_IN };
     FadeState fadeState_ = FadeState::NONE;
@@ -114,6 +116,7 @@ private:
     GLuint starfieldShader_ = 0;
     GLuint freqShader_ = 0;
     GLuint flatShader_ = 0;
+    GLuint lineShader_ = 0;
 
     // Mesh VAOs and VBOs
     GLuint cubeVAO_ = 0, cubeVBO_ = 0;

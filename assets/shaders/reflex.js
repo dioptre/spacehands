@@ -142,6 +142,7 @@
                 <div id="hud-score" class="score-val">000,000</div>
             </div>
             <div id="hud-song-info" class="hud-panel" style="text-align:center;">
+                <div id="hud-accuracy" style="font-size:1.3rem;font-weight:400;color:rgba(255,255,255,0.55);font-family:monospace;letter-spacing:1px;margin-bottom:3px;">100%</div>
                 <div id="hud-title" style="font-size:1.1rem;font-weight:600;">Seven Nation Army</div>
                 <div id="hud-bpm" style="font-size:0.8rem;opacity:0.6;">120 BPM</div>
             </div>
@@ -448,6 +449,14 @@ const hudTitle = document.getElementById('hud-title');
 const hudBpm = document.getElementById('hud-bpm');
 const endRankVal = document.getElementById('end-rank-val');
 const endScoreVal = document.getElementById('end-score-val');
+const hudAccuracy = document.getElementById('hud-accuracy');
+
+function updateAccuracy() {
+    if (hudAccuracy) {
+        let acc = totalHits > 0 ? Math.round((hitSuccess / totalHits) * 100) : 100;
+        hudAccuracy.textContent = acc + '%';
+    }
+}
 
 function showFeedback(text, ratingClass) {
     reflexFeedback.textContent = text;
@@ -494,6 +503,7 @@ function startSong(songId, bpm, cps) {
 
     hudScore.textContent = '000,000';
     hudCombo.textContent = '0';
+    updateAccuracy();
     
     const songNames = {
         '1': 'Seven Nation Army',
@@ -791,6 +801,7 @@ function animate() {
                     t.hit = true;
                     totalHits++;
                     hitSuccess++;
+                    updateAccuracy();
                     combo++;
                     if (combo > maxCombo) maxCombo = combo;
                     
@@ -830,6 +841,7 @@ function animate() {
                 // Missed!
                 t.missed = true;
                 totalHits++;
+                updateAccuracy();
                 combo = 0;
                 hudCombo.textContent = '0';
                 showFeedback('MISS', 'rating-miss');
@@ -875,6 +887,7 @@ function animate() {
                 target.hit = true;
                 totalHits++;
                 hitSuccess++;
+                updateAccuracy();
                 combo++;
                 if (combo > maxCombo) maxCombo = combo;
                 

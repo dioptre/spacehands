@@ -13,9 +13,9 @@
 #endif
 
 static const std::string SONG_PATTERNS[30] = {
-    "<[~@2 b4 a4@2 b4@2 g4] [~@2 b4 g4 a4 b4 ~@2] [~@2 b4 a4@2 b4@2 g4] [~@2 d5 b4@2 a4 ~@2] [~ b4@2 a4@2 g4@2 ~] [g4@2 b4 d5@2 b4@2 g4] [a4@2 c5 b4@2 a4@2 fs4] [g4@2 a4 b4@2 d5@2 ~]>", // Here Comes The Sun
+    "<[~@2 b4 a4@2 b4@2 g4] [~@2 b4 g4 a4 b4 _@2] [~@2 b4 a4@2 b4@2 g4] [~@2 d5 b4@2 a4 _@2] [_ b4@2 a4@2 g4@2 _] [g4@2 b4 d5@2 b4@2 g4] [a4@2 c5 b4@2 a4@2 fs4] [g4@2 a4 b4@2 d5@2 _]>", // Here Comes The Sun
     "<[e5@2 e5 g5@2 e5@2 d5] c5@2 b4@4 [e5@2 e5 g5@2 e5@2 d5] c5 d5 c5 b4@2>", // Seven Nation Army
-    "<[g4 b4 c5 ~] [g4 b4 db5 c5] [g4 b4 c5 b4 g4 ~] ~>", // Smoke on the Water
+    "<[g4 b4 c5 _] [g4 b4 db5 c5] [g4 b4 c5 b4 g4 _] _>", // Smoke on the Water
     "<[b4 b4 c5 d5] [d5 c5 b4 a4] [g4 g4 a4 b4] [b4@1.5 a4@0.5 a4@2] [b4 b4 c5 d5] [d5 c5 b4 a4] [g4 g4 a4 b4] [a4@1.5 g4@0.5 g4@2]>", // Ode to Joy
     "<[c4 c4 g4 g4] [a4 a4 g4@2] [f4 f4 e4 e4] [d4 d4 c4@2] [g4 g4 f4 f4] [e4 e4 d4@2] [g4 g4 f4 f4] [e4 e4 d4@2]>", // Twinkle Twinkle
     "<c5 b4@1.5 a4@0.5 g4@2 f4 e4 d4 c4 g4@1.5 a4@0.5 a4@2 b4@1.5 c5@0.5 c5@2>", // Joy to the World
@@ -23,9 +23,9 @@ static const std::string SONG_PATTERNS[30] = {
     "<[e4 d4 c4 d4] [e4 e4 e4@2] [d4 d4 d4@2] [e4 g4 g4@2] [e4 d4 c4 d4] [e4 e4 e4 e4] [d4 d4 e4 d4] c4@4>", // Mary Had a Little Lamb
     "<[g4 g4 g4 eb4@1.5 bb4@0.5] [g4 eb4@1.5 bb4@0.5 g4@2] [d5 d5 d5 eb5@1.5 bb4@0.5] [fs4 eb4@1.5 bb4@0.5 g4@2]>", // Imperial March
     "<[fs4@1.5 a4@1.5 fs4@1 fs4@0.5 b4 fs4 e4] [fs4@1.5 cs5@1.5 fs4@1 fs4@0.5 d5 cs5 a4] [fs4 cs5 fs5 fs4@0.5 e4 e4 cs4 gs4 fs4@2]>", // Axel F
-    "<[e5 e5 ~ e5] [~ c5 e5 ~] [g5 ~ ~ ~] [g4 ~ ~ ~] [c5 ~ ~ g4] [~ ~ e4 ~] [~ a4 ~ b4] [~ bb4 a4 ~]>", // Mario
+    "<[e5 e5 ~ e5] [~ c5 e5 _] [g5 _ _ _] [g4 _ _ _] [c5 _ _ g4] [_ _ e4 _] [_ a4 _ b4] [_ bb4 a4 _]>", // Mario
     "<[e4 a4 b4 c5] [a4@2 ~ e4 a4 b4 c5] [a4@2 ~ e4 a4 b4 c5] [b4 a4 c5 b4 a4 e5] [e5@2 ~ e5 d5 e5 f5] [f5@2 ~ f5 e5 d5 f5] [e5@2 ~ e5 d5 c5 b4] [e4@2 b4 a4@2]>", // Bella Ciao
-    "<[e5 b4 c5 d5] [c5@0.5 b4@0.5 a4@2 c5] [e5 d5 c5 b4] [c5@1.5 d5@0.5 e5@2 c5] [a4 a4 ~ ~] [d5@1.5 f5@0.5 a5 g5] [f5 c5@1.5 e5 d5] [c5 b4 c5 d5] [e5 c5 a4 a4]>", // Tetris
+    "<[e5 b4 c5 d5] [c5@0.5 b4@0.5 a4@2 c5] [e5 d5 c5 b4] [c5@1.5 d5@0.5 e5@2 c5] [a4 a4 _ _] [d5@1.5 f5@0.5 a5 g5] [f5 c5@1.5 e5 d5] [c5 b4 c5 d5] [e5 c5 a4 a4]>", // Tetris
     "<[c4 c4 c4@1.5 d4@0.5 e4] [e4@1.5 d4@0.5 e4@1.5 f4@0.5 g4@2] [[c5@0.33 c5@0.33 c5@0.33] [g4@0.33 g4@0.33 g4@0.33] [e4@0.33 e4@0.33 e4@0.33] [c4@0.33 c4@0.33 c4@0.33]] [g4@1.5 f4@0.5 e4@1.5 d4@0.5 c4@2]>", // Row Your Boat
     "<[c4@1.5 d4@0.5 e4 g4] [e4@1.5 c4@0.5 c4@2] [c4@1.5 d4@0.5 e4 c4] [g4@2 e4@2] [c4@1.5 d4@0.5 e4 g4] [e4@1.5 c4@0.5 a4@2] [d4@2 f4@2] [e4@1.5 d4@0.5 c4@2]>", // Pop Goes the Weasel
     "<[e5 ds5 e5 ds5 e5 b4 d5 c5] a4@4 [c4 e4 a4 b4] e4@4 [e4 gs4 b4 c5] e4@4>", // Fur Elise
@@ -228,6 +228,7 @@ void Renderer::close() {
         if (starfieldShader_) glDeleteProgram(starfieldShader_);
         if (freqShader_) glDeleteProgram(freqShader_);
         if (flatShader_) glDeleteProgram(flatShader_);
+        if (lineShader_) glDeleteProgram(lineShader_);
 
         glfwDestroyWindow(window_);
         window_ = nullptr;
@@ -326,19 +327,33 @@ void Renderer::initShaders() {
         uniform mat4 view;
         uniform mat4 projection;
         uniform mat4 model;
+        uniform float u_time;
+        out float v_twinkle;
         void main() {
             gl_Position = projection * view * model * vec4(aPos, 1.0);
-            gl_PointSize = 12.0;
+            // Twinkling scale factor based on position and time
+            v_twinkle = 0.65 + 0.35 * sin(u_time * 4.5 + aPos.x * 123.4 + aPos.y * 56.7);
+            // Size variation between 6.0 and 18.0 pixels
+            float sizeBase = 12.0 + 6.0 * sin(aPos.x * 99.0 + aPos.z * 11.0);
+            gl_PointSize = sizeBase * v_twinkle;
         }
     )";
 
     const std::string starFragShader = R"(
         #version 150
         out vec4 FragColor;
+        in float v_twinkle;
         uniform vec3 color;
         uniform float opacity;
         void main() {
-            FragColor = vec4(color, opacity);
+            float dist = length(gl_PointCoord - vec2(0.5));
+            if (dist > 0.5) {
+                discard;
+            }
+            // Soft glowing center with smooth edge falloff
+            float glow = exp(-dist * 5.0) * 1.5;
+            float alpha = glow * opacity * v_twinkle;
+            FragColor = vec4(color, alpha);
         }
     )";
 
@@ -439,6 +454,33 @@ void Renderer::initShaders() {
     flatShader_ = linkProgram(vFlat, fFlat);
     glDeleteShader(vFlat);
     glDeleteShader(fFlat);
+
+    const std::string lineVertShader = R"(
+        #version 150
+        in vec3 aPos;
+        uniform mat4 view;
+        uniform mat4 projection;
+        uniform mat4 model;
+        void main() {
+            gl_Position = projection * view * model * vec4(aPos, 1.0);
+        }
+    )";
+
+    const std::string lineFragShader = R"(
+        #version 150
+        out vec4 fragColor;
+        uniform vec3 u_color;
+        uniform float u_opacity;
+        void main() {
+            fragColor = vec4(u_color, u_opacity);
+        }
+    )";
+
+    GLuint vLine = compileShader(lineVertShader, GL_VERTEX_SHADER);
+    GLuint fLine = compileShader(lineFragShader, GL_FRAGMENT_SHADER);
+    lineShader_ = linkProgram(vLine, fLine);
+    glDeleteShader(vLine);
+    glDeleteShader(fLine);
 }
 
 void Renderer::initMeshes() {
@@ -833,6 +875,84 @@ void Renderer::updateCellVisuals(int i, glm::vec3& color, glm::vec3& emissive, f
     }
 }
 
+void drawStrokeString(GLuint lineShader, const glm::mat4& projection, const glm::mat4& view, const std::string& text, float x, float y, float z, float scale, const glm::vec3& color, float opacity) {
+    std::vector<float> verts;
+
+    float charWidth = 0.08f * scale;
+    float charHeight = 0.14f * scale;
+    float spacing = 0.04f * scale;
+
+    float curX = x - (text.length() * (charWidth + spacing)) * 0.5f;
+
+    for (char c : text) {
+        std::vector<glm::vec2> strokes;
+        if (c == '0') {
+            strokes = { {0,0},{1,0}, {1,0},{1,1}, {1,1},{0,1}, {0,1},{0,0} };
+        } else if (c == '1') {
+            strokes = { {0.5f,0},{0.5f,1} };
+        } else if (c == '2') {
+            strokes = { {0,1},{1,1}, {1,1},{1,0.5f}, {1,0.5f},{0,0.5f}, {0,0.5f},{0,0}, {0,0},{1,0} };
+        } else if (c == '3') {
+            strokes = { {0,1},{1,1}, {1,1},{0,0}, {0,0.5f},{1,0.5f}, {1,1},{1,0}, {1,0},{0,0} };
+        } else if (c == '4') {
+            strokes = { {0,1},{0,0.5f}, {0,0.5f},{1,0.5f}, {1,1},{1,0} };
+        } else if (c == '5') {
+            strokes = { {1,1},{0,1}, {0,1},{0,0.5f}, {0,0.5f},{1,0.5f}, {1,0.5f},{1,0}, {1,0},{0,0} };
+        } else if (c == '6') {
+            strokes = { {1,1},{0,1}, {0,1},{0,0}, {0,0},{1,0}, {1,0},{1,0.5f}, {1,0.5f},{0,0.5f} };
+        } else if (c == '7') {
+            strokes = { {0,1},{1,1}, {1,1},{0,0} };
+        } else if (c == '8') {
+            strokes = { {0,0},{1,0}, {1,0},{1,1}, {1,1},{0,1}, {0,1},{0,0}, {0,0.5f},{1,0.5f} };
+        } else if (c == '9') {
+            strokes = { {0,0.5f},{1,0.5f}, {0,1},{1,1}, {1,1},{1,0}, {0,1},{0,0.5f}, {1,0},{0,0} };
+        } else if (c == '%') {
+            strokes = { 
+                {0,0},{1,1},
+                {0.15f,0.75f},{0.3f,0.75f}, {0.3f,0.75f},{0.3f,0.9f}, {0.3f,0.9f},{0.15f,0.9f}, {0.15f,0.9f},{0.15f,0.75f},
+                {0.7f,0.1f},{0.85f,0.1f}, {0.85f,0.1f},{0.85f,0.25f}, {0.85f,0.25f},{0.7f,0.25f}, {0.7f,0.25f},{0.7f,0.1f}
+            };
+        } else if (c == '.') {
+            strokes = { {0.45f,0},{0.55f,0}, {0.55f,0},{0.55f,0.1f}, {0.55f,0.1f},{0.45f,0.1f}, {0.45f,0.1f},{0.45f,0} };
+        }
+
+        for (size_t i = 0; i < strokes.size(); i += 2) {
+            float x1 = curX + strokes[i].x * charWidth;
+            float y1 = y + strokes[i].y * charHeight;
+            float z1 = z;
+            float x2 = curX + strokes[i+1].x * charWidth;
+            float y2 = y + strokes[i+1].y * charHeight;
+            float z2 = z;
+
+            verts.push_back(x1); verts.push_back(y1); verts.push_back(z1);
+            verts.push_back(x2); verts.push_back(y2); verts.push_back(z2);
+        }
+
+        curX += charWidth + spacing;
+    }
+
+    if (!verts.empty()) {
+        glUseProgram(lineShader);
+        glUniformMatrix4fv(glGetUniformLocation(lineShader, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+        glUniformMatrix4fv(glGetUniformLocation(lineShader, "view"), 1, GL_FALSE, glm::value_ptr(view));
+        glUniformMatrix4fv(glGetUniformLocation(lineShader, "model"), 1, GL_FALSE, glm::value_ptr(glm::mat4(1.0f)));
+        glUniform3fv(glGetUniformLocation(lineShader, "u_color"), 1, glm::value_ptr(color));
+        glUniform1f(glGetUniformLocation(lineShader, "u_opacity"), opacity);
+
+        GLuint textVAO, textVBO;
+        glGenVertexArrays(1, &textVAO);
+        glGenBuffers(1, &textVBO);
+        glBindVertexArray(textVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, textVBO);
+        glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(float), verts.data(), GL_STREAM_DRAW);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+        glEnableVertexAttribArray(0);
+        glDrawArrays(GL_LINES, 0, verts.size() / 3);
+        glDeleteBuffers(1, &textVBO);
+        glDeleteVertexArrays(1, &textVAO);
+    }
+}
+
 void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spawns, float dt) {
     // All 10 lanes are active by default to support 10-note melodic songs mapping
     int activeLanes = 10;
@@ -854,7 +974,7 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
         glm::vec3(-0.5f, 0.5f, 0.6f),   // Row 2, 7: Purple (Mid-Upper-Left)
         glm::vec3(0.5f, 0.5f, 0.6f),    // Row 2, 8: Pink (Mid-Upper-Right)
         
-        glm::vec3(0.0f, 1.1f, 0.9f)     // Row 1, 9: Gold/White (Top Peak)
+        glm::vec3(0.0f, 0.95f, 0.7f)     // Row 1, 9: Gold/White (Top Peak)
     };
 
     std::array<glm::vec3, 10> laneColors = {
@@ -883,6 +1003,8 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
             idleTimer_ = 0.0f;   // hand-loss timeout timer
             score_ = 0;
             combo_ = 0;
+            totalNotesPassed_ = 0;
+            successfulHits_ = 0;
             if (osc_) {
                 osc_->sendReflexHush(); // play hush first!
                 osc_->setReflexActive(true);
@@ -1024,6 +1146,7 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
     glUseProgram(starfieldShader_);
     glm::mat4 starModel = glm::rotate(glm::mat4(1.0f), (float)glfwGetTime() * 0.015f, glm::vec3(0.0f, 1.0f, 0.0f));
     glUniformMatrix4fv(glGetUniformLocation(starfieldShader_, "model"), 1, GL_FALSE, glm::value_ptr(starModel));
+    glUniform1f(glGetUniformLocation(starfieldShader_, "u_time"), (float)glfwGetTime());
     glUniform3f(glGetUniformLocation(starfieldShader_, "color"), 0.2f, 0.5f, 0.9f);
     glUniform1f(glGetUniformLocation(starfieldShader_, "opacity"), 0.6f);
     glBindVertexArray(starfieldVAO_);
@@ -1071,10 +1194,6 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
             drawModel(alienModel_, model, col * pulse, col * 0.4f, 0.9f);
         }
     } else if (state_ == VisualizerState::PLAYING) {
-        // Draw sloped Guitar Hero Fretboard highway lines branching into 3D lanes!
-        glUseProgram(flatShader_);
-        glUniform1f(glGetUniformLocation(flatShader_, "u_opacity"), 0.2f);
-        
         float horizonZ = -10.0f;
         float horizonY = 1.2f;
         std::array<float, 10> horizonX = {
@@ -1083,6 +1202,11 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
             -0.1f, 0.1f,                // Row 2 (7-8)
             0.0f                        // Row 1 (9)
         };
+
+        // Draw sloped Guitar Hero Fretboard highway lines branching into 3D lanes! (Commented out to hide guide lines)
+        /*
+        glUseProgram(flatShader_);
+        glUniform1f(glGetUniformLocation(flatShader_, "u_opacity"), 0.2f);
 
         std::vector<float> boardVerts;
         float fretPhase = glm::fract(glfwGetTime() * 0.35f);
@@ -1115,6 +1239,7 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
         glDrawArrays(GL_LINES, 0, boardVerts.size() / 3);
         glDeleteBuffers(1, &boardVBO);
         glDeleteVertexArrays(1, &boardVAO);
+        */
 
         // Static variables for receptor hit flames
         static std::array<float, 10> flameIntensity = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
@@ -1138,10 +1263,12 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
                     float dy = std::abs(handPos.y - receptors[it->lane].y);
                     float dz = std::abs(handPos.z - receptors[it->lane].z);
                     
-                    if (dx < 0.85f && dy < 0.75f && dz < 1.8f) {
+                    if (dx < 0.85f && dy < 0.85f && dz < 2.0f) {
                         it->hit = true;
                         combo_++;
                         score_ += 100 * combo_;
+                        successfulHits_++;
+                        totalNotesPassed_++;
                         
                         flameIntensity[it->lane] = 1.0f;
                         burstParticles(receptors[it->lane]);
@@ -1177,6 +1304,7 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
 
             if (it->progress > 1.2f) {
                 if (!it->hit) {
+                    totalNotesPassed_++;
                     combo_ = 0;
                 }
                 it = notes_.erase(it);
@@ -1185,7 +1313,8 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
             }
         }
 
-        // Draw Receptors
+        // Draw Receptors (hidden as requested)
+        /*
         for (int i = 0; i < 10; i++) {
             glm::vec3 col = laneColors[i];
             float opacity = 0.8f;
@@ -1195,6 +1324,7 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
             drawFlatRing(receptors[i], radius, col, opacity);
             drawRing(receptors[i], radius * 0.7f, col * 0.7f, vOpacity);
         }
+        */
 
         // Draw Receptor hit flames
         for (int i = 0; i < 10; i++) {
@@ -1231,6 +1361,11 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
                 drawSphere(model, col, col * 0.6f, 0.95f);
             }
         }
+
+        // Draw real-time accuracy percentage floating in space at top center
+        int acc = totalNotesPassed_ > 0 ? (int)std::round((float)successfulHits_ / (float)totalNotesPassed_ * 100.0f) : 100;
+        std::string accStr = std::to_string(acc) + "%";
+        drawStrokeString(lineShader_, projection, view, accStr, 0.0f, 1.45f, 0.0f, 1.0f, glm::vec3(0.9f, 0.9f, 0.95f), 0.35f);
     } else if (state_ == VisualizerState::CONGRATULATIONS) {
         // Fireworks state: spawn new explosions periodically
         static float fireworkTimer = 0.0f;
@@ -1265,6 +1400,9 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
         if (it->life <= 0.0f) {
             it = particles_.erase(it);
         } else {
+            // Apply gravity and drag for realistic physics
+            it->vel.y -= dt * 2.0f;
+            it->vel *= (1.0f - dt * 0.5f);
             it->pos += it->vel * dt;
             particleCoords.push_back(it->pos.x);
             particleCoords.push_back(it->pos.y);
@@ -1276,6 +1414,7 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
     if (!particleCoords.empty()) {
         glUseProgram(starfieldShader_);
         glUniformMatrix4fv(glGetUniformLocation(starfieldShader_, "model"), 1, GL_FALSE, glm::value_ptr(glm::mat4(1.0f)));
+        glUniform1f(glGetUniformLocation(starfieldShader_, "u_time"), (float)glfwGetTime());
         
         // Beautiful rainbow shifting color for fireworks and hits!
         float r = 0.5f + 0.5f * std::sin(glfwGetTime() * 4.0f);
