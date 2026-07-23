@@ -1129,7 +1129,7 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
             float nz = glm::mix(horizonZ, receptors[it->lane].z, t);
             it->pos = glm::vec3(nx, ny, nz);
 
-            if (std::abs(it->progress - 1.0f) < 0.18f && !it->hit) {
+            if (std::abs(it->progress - 1.0f) < 0.15f && !it->hit) {
                 for (const auto& h : hands) {
                     float mx = cfg_->mirror_x ? (1.0f - h.x) : h.x;
                     glm::vec3 handPos = handWorldPos(mx, h.y, h.z, aspect);
@@ -1138,7 +1138,7 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
                     float dy = std::abs(handPos.y - receptors[it->lane].y);
                     float dz = std::abs(handPos.z - receptors[it->lane].z);
                     
-                    if (dx < 1.15f && dy < 1.05f && dz < 2.5f) {
+                    if (dx < 0.85f && dy < 0.75f && dz < 1.8f) {
                         it->hit = true;
                         combo_++;
                         score_ += 100 * combo_;
