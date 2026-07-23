@@ -1361,12 +1361,30 @@ void Renderer::render(const HandList& hands, const std::vector<TargetSpawn>& spa
                 drawSphere(model, col, col * 0.6f, 0.95f);
             }
         }
-
-        // Draw real-time accuracy percentage floating in space at top center
+    }
+    
+    // Draw real-time accuracy percentage floating in space at top center (highlighted during fireworks)
+    if (state_ == VisualizerState::PLAYING || state_ == VisualizerState::CONGRATULATIONS) {
         int acc = totalNotesPassed_ > 0 ? (int)std::round((float)successfulHits_ / (float)totalNotesPassed_ * 100.0f) : 100;
         std::string accStr = std::to_string(acc) + "%";
-        drawStrokeString(lineShader_, projection, view, accStr, 0.0f, 1.45f, 0.0f, 1.0f, glm::vec3(0.9f, 0.9f, 0.95f), 0.35f);
-    } else if (state_ == VisualizerState::CONGRATULATIONS) {
+
+        float scale = 1.0f;
+        float opacity = 0.35f;
+        glm::vec3 col(0.9f, 0.9f, 0.95f);
+
+        if (state_ == VisualizerState::CONGRATULATIONS) {
+            // Highlight briefly for the first 4.0 seconds of fireworks!
+            if (congratsTimer_ < 4.0f) {
+                col = glm::vec3(1.0f, 0.85f, 0.0f); // Bright Gold
+                scale = 1.5f + 0.15f * std::sin(congratsTimer_ * 8.0f); // Pulse size
+                opacity = 0.8f + 0.2f * std::sin(congratsTimer_ * 16.0f); // Fast flashing opacity
+            }
+        }
+
+        drawStrokeString(lineShader_, projection, view, accStr, 0.0f, 1.45f, 0.0f, scale, col, opacity);
+    }
+
+    if (state_ == VisualizerState::CONGRATULATIONS) {
         // Fireworks state: spawn new explosions periodically
         static float fireworkTimer = 0.0f;
         fireworkTimer += dt;
